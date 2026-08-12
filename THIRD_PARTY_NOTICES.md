@@ -1,6 +1,6 @@
 # Third-party notices
 
-Legacy RTS incorporates or builds upon the following open-source projects.
+Tiberian Dawn for iPad incorporates or builds upon the following open-source projects.
 Their names do not imply endorsement.
 
 ## Vanilla Conquer and Electronic Arts source

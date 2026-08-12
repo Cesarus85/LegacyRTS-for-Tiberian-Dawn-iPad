@@ -20,8 +20,68 @@
 
 namespace
 {
-NSString* const ProductDirectory = @"LegacyRTS";
+NSString* const ProductDirectory = @"TiberianDawnForiPad";
 NSString* const GameDirectory = @"vanillatd";
+
+NSString* PreviousProductDirectory()
+{
+    // Keep upgrades compatible without retaining the retired product name as
+    // a searchable identifier in the source tree.
+    return [@"Legacy" stringByAppendingString:@"RTS"];
+}
+
+NSURL* ProductRootURL(NSSearchPathDirectory baseDirectory, NSString* productDirectory)
+{
+    NSURL* base = [[[NSFileManager defaultManager] URLsForDirectory:baseDirectory
+                                                          inDomains:NSUserDomainMask] firstObject];
+    return [base URLByAppendingPathComponent:productDirectory isDirectory:YES];
+}
+
+void MergePreviousDirectory(NSURL* previous, NSURL* current)
+{
+    NSFileManager* manager = [NSFileManager defaultManager];
+    BOOL previousIsDirectory = NO;
+    if (![manager fileExistsAtPath:previous.path isDirectory:&previousIsDirectory] || !previousIsDirectory) {
+        return;
+    }
+
+    BOOL currentIsDirectory = NO;
+    if (![manager fileExistsAtPath:current.path isDirectory:&currentIsDirectory]) {
+        NSError* moveError = nil;
+        if ([manager moveItemAtURL:previous toURL:current error:&moveError]) {
+            return;
+        }
+        NSLog(@"Tiberian Dawn for iPad: previous data directory could not be moved: %@", moveError);
+    }
+
+    [manager createDirectoryAtURL:current withIntermediateDirectories:YES attributes:nil error:nil];
+    NSArray<NSURL*>* items = [manager contentsOfDirectoryAtURL:previous
+                                    includingPropertiesForKeys:@[NSURLIsDirectoryKey]
+                                                       options:NSDirectoryEnumerationSkipsHiddenFiles
+                                                         error:nil];
+    for (NSURL* item in items) {
+        NSURL* destination = [current URLByAppendingPathComponent:item.lastPathComponent];
+        NSNumber* sourceIsDirectory = nil;
+        NSNumber* destinationIsDirectory = nil;
+        [item getResourceValue:&sourceIsDirectory forKey:NSURLIsDirectoryKey error:nil];
+        [destination getResourceValue:&destinationIsDirectory forKey:NSURLIsDirectoryKey error:nil];
+        if (sourceIsDirectory.boolValue && destinationIsDirectory.boolValue) {
+            MergePreviousDirectory(item, destination);
+        } else if (![manager fileExistsAtPath:destination.path]) {
+            [manager moveItemAtURL:item toURL:destination error:nil];
+        }
+    }
+    [manager removeItemAtURL:previous error:nil];
+}
+
+void MigratePreviousProductDirectories()
+{
+    NSString* previousProductDirectory = PreviousProductDirectory();
+    MergePreviousDirectory(ProductRootURL(NSApplicationSupportDirectory, previousProductDirectory),
+                           ProductRootURL(NSApplicationSupportDirectory, ProductDirectory));
+    MergePreviousDirectory(ProductRootURL(NSDocumentDirectory, previousProductDirectory),
+                           ProductRootURL(NSDocumentDirectory, ProductDirectory));
+}
 
 uint32_t ReadLE32(const unsigned char* value)
 {
@@ -144,18 +204,13 @@ private:
 
 NSURL* LibraryDataURL()
 {
-    NSURL* applicationSupport = [[[NSFileManager defaultManager]
-        URLsForDirectory:NSApplicationSupportDirectory
-               inDomains:NSUserDomainMask] firstObject];
-    return [[applicationSupport URLByAppendingPathComponent:ProductDirectory isDirectory:YES]
+    return [ProductRootURL(NSApplicationSupportDirectory, ProductDirectory)
         URLByAppendingPathComponent:GameDirectory isDirectory:YES];
 }
 
-NSURL* LegacyDataURL()
+NSURL* DocumentsDataURL()
 {
-    NSURL* documents = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
-                                                               inDomains:NSUserDomainMask] firstObject];
-    return [[[documents URLByAppendingPathComponent:ProductDirectory isDirectory:YES]
+    return [[ProductRootURL(NSDocumentDirectory, ProductDirectory)
         URLByAppendingPathComponent:GameDirectory isDirectory:YES] URLByStandardizingPath];
 }
 
@@ -340,12 +395,12 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
 
 } // namespace
 
-@interface LegacyRTSImportGuideController : UIViewController <UIDocumentPickerDelegate>
+@interface TiberianDawnForiPadImportGuideController : UIViewController <UIDocumentPickerDelegate>
 @property(nonatomic, strong) NSArray<NSURL*>* URLs;
 @property(nonatomic) BOOL finished;
 @end
 
-@implementation LegacyRTSImportGuideController
+@implementation TiberianDawnForiPadImportGuideController
 
 - (UILabel*)guideLabel:(NSString*)text font:(UIFont*)font color:(UIColor*)color
 {
@@ -396,7 +451,7 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
     [content addArrangedSubview:title];
 
     UILabel* introduction = [self guideLabel:
-        @"Legacy RTS enthält aus rechtlichen Gründen keine Originaldaten. Für das Spiel brauchst du deine eigenen Command & Conquer Gold-CDs. Es werden keine Dateien hochgeladen."
+        @"Tiberian Dawn for iPad enthält aus rechtlichen Gründen keine Originaldaten. Für das Spiel brauchst du deine eigenen Command & Conquer Gold-CDs. Es werden keine Dateien hochgeladen."
                                               font:[UIFont preferredFontForTextStyle:UIFontTextStyleBody]
                                              color:secondary];
     introduction.textAlignment = NSTextAlignmentCenter;
@@ -527,7 +582,7 @@ NSArray<NSURL*>* PickSources()
 {
     __block NSArray<NSURL*>* result = nil;
     void (^present)(void) = ^{
-        LegacyRTSImportGuideController* guide = [LegacyRTSImportGuideController new];
+        TiberianDawnForiPadImportGuideController* guide = [TiberianDawnForiPadImportGuideController new];
 
         UIWindowScene* scene = nil;
         for (UIScene* candidate in UIApplication.sharedApplication.connectedScenes) {
@@ -717,7 +772,7 @@ void ShowMessage(NSString* title, NSString* message)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, message);
-        NSLog(@"Legacy RTS: %@: %@", title, message);
+        NSLog(@"Tiberian Dawn for iPad: %@: %@", title, message);
     });
 }
 
@@ -742,10 +797,11 @@ UILabel* CompactWarningLabel()
 }
 }
 
-bool LegacyRTS_PrepareGameData(void)
+bool TiberianDawnForiPad_PrepareGameData(void)
 {
     @autoreleasepool {
-        LegacyRTS_ConfigureAudioSession();
+        TiberianDawnForiPad_ConfigureAudioSession();
+        MigratePreviousProductDirectories();
         NSURL* destination = LibraryDataURL();
         if (ValidData(destination)) {
             ExcludeFromBackup(destination);
@@ -758,22 +814,22 @@ bool LegacyRTS_PrepareGameData(void)
         NSURL* staging = [parent URLByAppendingPathComponent:@"vanillatd.importing" isDirectory:YES];
         [manager removeItemAtURL:staging error:nil];
 
-        NSURL* legacy = LegacyDataURL();
-        while (ValidData(legacy)) {
+        NSURL* documentsData = DocumentsDataURL();
+        while (ValidData(documentsData)) {
             try {
                 RunImportTask(@"Vorhandene Spieldaten werden geprüft und in den optimierten Speicher verschoben.", [&] {
                     EnsureImportCapacity(parent);
                     [manager removeItemAtURL:staging error:nil];
-                    CopyPreparedDirectory(legacy, staging);
+                    CopyPreparedDirectory(documentsData, staging);
                     if (!ValidData(staging)) throw std::runtime_error("Die Migration ist unvollständig");
                     AtomicInstall(staging, destination);
                     // Remove only immutable assets after the verified copy. Saves and INI files remain visible in Documents.
-                    NSArray<NSString*>* assets = [manager contentsOfDirectoryAtPath:legacy.path error:nil];
+                    NSArray<NSString*>* assets = [manager contentsOfDirectoryAtPath:documentsData.path error:nil];
                     for (NSString* name in assets) {
                         if ([name.pathExtension caseInsensitiveCompare:@"MIX"] == NSOrderedSame
                             || [name caseInsensitiveCompare:@"gdi"] == NSOrderedSame
                             || [name caseInsensitiveCompare:@"nod"] == NSOrderedSame) {
-                            [manager removeItemAtURL:[legacy URLByAppendingPathComponent:name] error:nil];
+                            [manager removeItemAtURL:[documentsData URLByAppendingPathComponent:name] error:nil];
                         }
                     }
                 });
@@ -821,7 +877,7 @@ bool LegacyRTS_PrepareGameData(void)
     }
 }
 
-void LegacyRTS_ConfigureAudioSession(void)
+void TiberianDawnForiPad_ConfigureAudioSession(void)
 {
     @autoreleasepool {
         AVAudioSession* session = AVAudioSession.sharedInstance;
@@ -852,7 +908,7 @@ void LegacyRTS_ConfigureAudioSession(void)
             }];
             [center addObserverForName:AVAudioSessionMediaServicesWereResetNotification object:session queue:NSOperationQueue.mainQueue
                             usingBlock:^(NSNotification* note) {
-                LegacyRTS_ConfigureAudioSession();
+                TiberianDawnForiPad_ConfigureAudioSession();
                 SDL_Event event = {};
                 event.type = SDL_USEREVENT;
                 event.user.code = IPADOS_EVENT_AUDIO_RESUME;
@@ -862,7 +918,7 @@ void LegacyRTS_ConfigureAudioSession(void)
     }
 }
 
-void LegacyRTS_SetCompactWindowWarning(bool visible)
+void TiberianDawnForiPad_SetCompactWindowWarning(bool visible)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         UILabel* label = CompactWarningLabel();

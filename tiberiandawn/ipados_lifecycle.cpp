@@ -17,7 +17,7 @@
 
 extern bool InMovie;
 extern bool Get_Savefile_Info(const char* file_name, char* buf, unsigned* scenp, HousesType* housep);
-extern "C" void LegacyRTS_EndBackgroundTask(void);
+extern "C" void TiberianDawnForiPad_EndBackgroundTask(void);
 
 namespace
 {
@@ -178,7 +178,7 @@ void Handle_Lifecycle_Event(AppLifecycleEvent event)
     case APP_LIFECYCLE_ENTERED_BACKGROUND:
         Flush_Settings();
         Write_Recovery_Autosave();
-        LegacyRTS_EndBackgroundTask();
+        TiberianDawnForiPad_EndBackgroundTask();
         break;
     case APP_LIFECYCLE_LOW_MEMORY:
         if (!InMovie) {

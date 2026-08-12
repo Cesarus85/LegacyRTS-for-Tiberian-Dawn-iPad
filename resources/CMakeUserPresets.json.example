@@ -4,10 +4,10 @@
         {
             "name": "ipados-device-local",
             "inherits": "ipados-device",
-            "displayName": "Legacy RTS — My iPad",
+            "displayName": "Tiberian Dawn for iPad — My iPad",
             "binaryDir": "${sourceDir}/build/ipados-device",
             "cacheVariables": {
-                "IPADOS_BUNDLE_IDENTIFIER": "com.example.legacy-rts",
+                "IPADOS_BUNDLE_IDENTIFIER": "com.example.tiberian-dawn-for-ipad",
                 "IPADOS_DEVELOPMENT_TEAM": "YOUR_TEAM_ID"
             }
         },
@@ -50,16 +50,16 @@
         {
             "name": "ipados-device-local",
             "configurePreset": "ipados-device-local",
-            "displayName": "Legacy RTS — My iPad (Debug)",
+            "displayName": "Tiberian Dawn for iPad — My iPad (Debug)",
             "configuration": "Debug",
-            "targets": ["VanillaTD"]
+            "targets": ["TiberianDawn"]
         },
         {
             "name": "ipados-device-local-release",
             "configurePreset": "ipados-device-local",
-            "displayName": "Legacy RTS — My iPad (Release)",
+            "displayName": "Tiberian Dawn for iPad — My iPad (Release)",
             "configuration": "Release",
-            "targets": ["VanillaTD"]
+            "targets": ["TiberianDawn"]
         }
     ]
 }

@@ -35,7 +35,7 @@ void PathsClass::Init(const char* suffix, const char* ini_name, const char* data
     }
 
 #ifdef IPADOS_PORT
-    if (!LegacyRTS_PrepareGameData()) {
+    if (!TiberianDawnForiPad_PrepareGameData()) {
         DBG_WARN("iPadOS game-data preparation was cancelled or failed");
         // The engine cannot present a useful screen without original data.
         // A later first-run choice therefore ends cleanly and the guide is

@@ -2,7 +2,7 @@
 
 **EA has not endorsed and does not support this product.**
 
-Legacy RTS is a modified, independent community project based on Vanilla
+Tiberian Dawn for iPad is a modified, independent community project based on Vanilla
 Conquer and source code released by Electronic Arts. It is not the original
 program distributed by Electronic Arts and must not be represented as such.
 
@@ -11,7 +11,7 @@ adaptive windowing, touch and Apple Pencil input, Apple platform lifecycle and
 audio integration, game-data import, save and recovery handling, performance
 controls, and supporting documentation.
 
-Legacy RTS is not affiliated with, sponsored by, approved by, or endorsed by
+Tiberian Dawn for iPad is not affiliated with, sponsored by, approved by, or endorsed by
 Electronic Arts Inc. Command & Conquer and related names are trademarks of
 Electronic Arts. Plain-text references to the original game identify what this
 port is for and which user-supplied data it requires; no EA logo treatment,
