@@ -85,6 +85,42 @@
             "binaryDir": "${sourceDir}/build_msvc64",
             "displayName": "MSVC 2019 64bit Vanilla build",
             "architecture": "x64"
+        },
+        {
+            "name": "ipados-simulator",
+            "displayName": "iPadOS Simulator (Xcode)",
+            "generator": "Xcode",
+            "binaryDir": "${sourceDir}/build/ipados-simulator",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "iOS",
+                "CMAKE_OSX_SYSROOT": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH": "YES",
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/LegacyRTS-iPad-Simulator-Products",
+                "BUILD_VANILLATD": "ON",
+                "BUILD_VANILLARA": "OFF",
+                "BUILD_REMASTERTD": "OFF",
+                "BUILD_REMASTERRA": "OFF",
+                "BUILD_TESTS": "OFF",
+                "BUILD_TOOLS": "OFF",
+                "MAP_EDITORTD": "OFF",
+                "NETWORKING": "OFF",
+                "SDL1": "OFF",
+                "SDL2": "ON",
+                "OPENAL": "ON"
+            }
+        },
+        {
+            "name": "ipados-device",
+            "inherits": "ipados-simulator",
+            "displayName": "iPadOS Device (Xcode)",
+            "binaryDir": "${sourceDir}/build/ipados-device",
+            "cacheVariables": {
+                "CMAKE_OSX_SYSROOT": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk",
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/LegacyRTS-iPad-Device-Products",
+                "IPADOS_BUNDLE_IDENTIFIER": "org.openlegacyrts.ipad"
+            }
         }
     ],
     "buildPresets": [
@@ -122,6 +158,27 @@
             "displayName": "Vanilla Game Build",
             "description": "Vanilla Game Build",
             "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "ipados-simulator",
+            "configurePreset": "ipados-simulator",
+            "displayName": "Legacy RTS for iPad Simulator",
+            "configuration": "Debug",
+            "targets": ["VanillaTD"]
+        },
+        {
+            "name": "ipados-device",
+            "configurePreset": "ipados-device",
+            "displayName": "Legacy RTS for iPad Device",
+            "configuration": "Debug",
+            "targets": ["VanillaTD"]
+        },
+        {
+            "name": "ipados-device-release",
+            "configurePreset": "ipados-device",
+            "displayName": "Legacy RTS for iPad Release",
+            "configuration": "Release",
+            "targets": ["VanillaTD"]
         }
     ],
     "testPresets": [

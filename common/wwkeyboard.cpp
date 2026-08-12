@@ -365,9 +365,9 @@ bool WWKeyboardClass::Put_Element(unsigned short val)
         Tail = temp;
 
         /* set cached down state for given key, remove all bits */
-        if (DownSkip == 0) {
+        if (DownSkip == 0 && !(val & WWKEY_TEXT_BIT)) {
             bool isDown = !(val & KN_RLSE_BIT);
-            val &= ~(KN_SHIFT_BIT | KN_CTRL_BIT | KN_ALT_BIT | KN_RLSE_BIT | KN_BUTTON);
+            val &= ~(KN_SHIFT_BIT | KN_CTRL_BIT | KN_ALT_BIT | KN_RLSE_BIT | KN_TOUCH_BIT | KN_TEXT_BIT | KN_BUTTON);
             Set_Bit(DownState, val, isDown);
 
             if (Is_Mouse_Key(val)) {

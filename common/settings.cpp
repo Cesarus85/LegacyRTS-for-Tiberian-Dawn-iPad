@@ -26,7 +26,16 @@ SettingsClass::SettingsClass()
     Video.Height = 0;
     Video.Boxing = true;
     Video.BoxingAspectRatio = "16:10";
+#ifdef IPADOS_PORT
+    Video.FrameLimit = 60;
+#else
     Video.FrameLimit = 120;
+#endif
+    Video.BatterySaving = false;
+    Video.PresentationMode = 0;
+    Video.TouchUIScale = 100;
+    Video.LargeCursor = false;
+    Video.HighContrast = false;
     Video.InterpolationMode = 2;
     Video.HardwareCursor = false;
     Video.DOSMode = false;
@@ -63,6 +72,11 @@ void SettingsClass::Load(INIClass& ini)
     Video.Width = ini.Get_Int("Video", "Width", Video.Width);
     Video.Height = ini.Get_Int("Video", "Height", Video.Height);
     Video.FrameLimit = ini.Get_Int("Video", "FrameLimit", Video.FrameLimit);
+    Video.BatterySaving = ini.Get_Bool("Video", "BatterySaving", Video.BatterySaving);
+    Video.PresentationMode = Bound(ini.Get_Int("iPadOS", "PresentationMode", Video.PresentationMode), 0, 1);
+    Video.TouchUIScale = Bound(ini.Get_Int("iPadOS", "TouchUIScale", Video.TouchUIScale), 100, 150);
+    Video.LargeCursor = ini.Get_Bool("iPadOS", "LargeCursor", Video.LargeCursor);
+    Video.HighContrast = ini.Get_Bool("iPadOS", "HighContrast", Video.HighContrast);
     Video.HardwareCursor = ini.Get_Bool("Video", "HardwareCursor", Video.HardwareCursor);
     Video.DOSMode = ini.Get_Bool("Video", "DOSMode", Video.DOSMode);
     Video.Scaler = ini.Get_String("Video", "Scaler", Video.Scaler);
@@ -113,6 +127,11 @@ void SettingsClass::Save(INIClass& ini)
     ini.Put_Int("Video", "Width", Video.Width);
     ini.Put_Int("Video", "Height", Video.Height);
     ini.Put_Int("Video", "FrameLimit", Video.FrameLimit);
+    ini.Put_Bool("Video", "BatterySaving", Video.BatterySaving);
+    ini.Put_Int("iPadOS", "PresentationMode", Video.PresentationMode);
+    ini.Put_Int("iPadOS", "TouchUIScale", Video.TouchUIScale);
+    ini.Put_Bool("iPadOS", "LargeCursor", Video.LargeCursor);
+    ini.Put_Bool("iPadOS", "HighContrast", Video.HighContrast);
     ini.Put_Bool("Video", "HardwareCursor", Video.HardwareCursor);
     ini.Put_Bool("Video", "DOSMode", Video.DOSMode);
     ini.Put_String("Video", "Scaler", Video.Scaler);

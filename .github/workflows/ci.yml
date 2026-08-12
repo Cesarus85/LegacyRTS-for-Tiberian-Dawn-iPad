@@ -1,0 +1,44 @@
+name: Source and Apple builds
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check public source tree
+        run: ./scripts/check-release-tree.sh
+
+  host-tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: brew install cmake ninja sdl2 openal-soft
+      - name: Configure, build, and test
+        run: cmake --workflow --preset testing
+
+  ipados-compile:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Apply project SDL patch
+        run: ./scripts/prepare-ipados-dependencies.sh
+      - name: Configure unsigned iPad target
+        run: cmake --preset ipados-device
+      - name: Compile unsigned iPad target
+        run: cmake --build --preset ipados-device -- -quiet CODE_SIGNING_ALLOWED=NO

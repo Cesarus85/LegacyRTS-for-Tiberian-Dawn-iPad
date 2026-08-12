@@ -184,7 +184,13 @@ const char* PathsClass::Data_Path()
             Program_Path();
         }
 
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+        // Immutable CD assets belong in Application Support. Documents stays
+        // small, writable and useful for settings/save-game exchange in Files.
+        DataPath = User_Home() + "/Library/Application Support/LegacyRTS";
+#else
         DataPath = ProgramPath.substr(0, ProgramPath.find_last_of("/")) + SEP + "share";
+#endif
 
         if (!Suffix.empty()) {
             DataPath += SEP + Suffix;
@@ -197,7 +203,11 @@ const char* PathsClass::Data_Path()
 const char* PathsClass::User_Path()
 {
     if (UserPath.empty()) {
-#ifdef __APPLE__
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+        // Documents is writable and visible through Files. Only settings,
+        // save games and recovery autosaves live here.
+        UserPath = User_Home() + "/Documents/LegacyRTS";
+#elif defined(__APPLE__)
         UserPath = User_Home() + "/Library/Application Support/Vanilla-Conquer";
 #else
         UserPath = Get_Posix_Default("XDG_CONFIG_HOME", ".config") + "/vanilla-conquer";

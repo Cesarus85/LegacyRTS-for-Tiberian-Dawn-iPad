@@ -117,6 +117,7 @@ set(COMMONR_SRC
 )
 
 set(COMMONV_SRC
+    app_lifecycle.cpp
     framelimit.cpp
     gbuffer.cpp
     interpal.cpp
@@ -171,7 +172,14 @@ target_link_libraries(common PUBLIC ${COMMON_LIBS})
 target_include_directories(common PUBLIC .)
 target_compile_definitions(common PRIVATE FIXIT_FAST_LOAD $<$<CONFIG:Debug>:_DEBUG>)
 target_compile_options(common PUBLIC ${VC_CXX_FLAGS})
-target_compile_features(common PUBLIC cxx_std_11)
+if(IPADOS_PORT)
+    target_compile_definitions(common PRIVATE IPADOS_PORT)
+    # CMake 4.4 may leave the compiler feature table empty with the Xcode 26
+    # iOS generator. The project-wide CXX_STANDARD setting still emits C++11.
+    set_target_properties(common PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES)
+else()
+    target_compile_features(common PUBLIC cxx_std_11)
+endif()
 # Make build check state of git to check for uncommitted changes.
 add_dependencies(common check_git)
 

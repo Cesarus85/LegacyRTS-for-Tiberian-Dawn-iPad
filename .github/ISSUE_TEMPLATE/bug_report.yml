@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a reproducible Legacy RTS problem without sharing original game data
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach ISOs, extracted game assets, save files containing private information, signing material, or device identifiers.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Physical iPad
+        - macOS portability build
+        - Other host/test build
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Revision
+      description: Commit hash or release tag
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the screen or mission, expected result, and actual result.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Launch…
+        2. Open…
+        3. Tap…
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove usernames, absolute container paths, device IDs, and signing details.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Data and privacy checks
+      options:
+        - label: I used supported C&C Gold GDI and Nod data that I am legally entitled to use.
+          required: true
+        - label: I did not attach original game data or private signing/device information.
+          required: true

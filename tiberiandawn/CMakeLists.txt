@@ -125,6 +125,15 @@ set(TIBDAWN_SRC
     winstub.cpp
 )
 
+if(IPADOS_PORT)
+    list(APPEND TIBDAWN_SRC
+        ipados_lifecycle.cpp
+        ${CMAKE_SOURCE_DIR}/platform/apple/ipados_platform.mm
+        ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
+        ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
+    )
+endif()
+
 if(NETWORKING)
     list(APPEND TIBDAWN_NET_SRC
         ipxconn.cpp
@@ -228,6 +237,39 @@ if(BUILD_VANILLATD)
             MACOSX_BUNDLE_COPYRIGHT "Based on code released under GPLv3 by EA"
             MACOSX_BUNDLE_ICON_FILE "vanillatd_icon.icns"
         )
+
+        if(IPADOS_PORT)
+            # SDL's UIKit application delegate owns the real process entry
+            # point and calls the game's entry as SDL_main.
+            set_source_files_properties(startup.cpp PROPERTIES COMPILE_DEFINITIONS "main=SDL_main")
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/ipados/Assets.xcassets
+                ${CMAKE_SOURCE_DIR}/platform/apple/PrivacyInfo.xcprivacy
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources
+            )
+            target_sources(VanillaTD PRIVATE
+                ${CMAKE_SOURCE_DIR}/resources/ipados/Assets.xcassets
+                ${CMAKE_SOURCE_DIR}/platform/apple/PrivacyInfo.xcprivacy
+            )
+            set_target_properties(VanillaTD PROPERTIES
+                MACOSX_BUNDLE_GUI_IDENTIFIER "${IPADOS_BUNDLE_IDENTIFIER}"
+                MACOSX_BUNDLE_BUNDLE_NAME "Legacy RTS"
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/platform/apple/Info-iPadOS.plist.in"
+                XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${IPADOS_BUNDLE_IDENTIFIER}"
+                XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2"
+                XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST "NO"
+                XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
+                XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES"
+                XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+            )
+            target_link_libraries(VanillaTD "-framework UIKit" "-framework AVFAudio" "-framework UniformTypeIdentifiers")
+            if(IPADOS_DEVELOPMENT_TEAM)
+                set_target_properties(VanillaTD PROPERTIES
+                    XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${IPADOS_DEVELOPMENT_TEAM}"
+                    XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+                )
+            endif()
+        endif()
     endif()
 
     target_compile_definitions(VanillaTD PUBLIC $<$<CONFIG:Debug>:_DEBUG> ${VANILLA_DEFS} MEGAMAPS)

@@ -51,6 +51,10 @@ typedef enum
     WWKEY_RLS_BIT = 0x800,
     WWKEY_VK_BIT = 0x1000,
     WWKEY_DBL_BIT = 0x2000,
+    // Text produced by the active OS keyboard layout (SDL_TEXTINPUT).
+    // This is deliberately separate from physical scancodes so QWERTZ,
+    // accents and the iPad software keyboard do not alter gameplay hotkeys.
+    WWKEY_TEXT_BIT = 0x4000,
     WWKEY_BTN_BIT = 0x8000,
 } WWKey_Type;
 
@@ -839,6 +843,8 @@ typedef enum KeyNumType : unsigned short
     KN_CTRL_BIT = WWKEY_CTRL_BIT,
     KN_ALT_BIT = WWKEY_ALT_BIT,
     KN_RLSE_BIT = WWKEY_RLS_BIT,
+    KN_TOUCH_BIT = WWKEY_DBL_BIT,
+    KN_TEXT_BIT = WWKEY_TEXT_BIT,
     KN_BUTTON = WWKEY_BTN_BIT,
 
     KN_MOUSEWHEEL_UP = VK_MOUSEWHEEL_UP,

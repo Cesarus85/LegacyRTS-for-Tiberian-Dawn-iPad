@@ -49,6 +49,9 @@ private:
         BUTTON_TINT,
         BUTTON_RESET,
         BUTTON_OPTIONS,      // Button number for "Options menu"
+        BUTTON_IPAD_PRESENTATION,
+        BUTTON_IPAD_UI_SCALE,
+        BUTTON_IPAD_ACCESSIBILITY,
         OPTION_WIDTH = 216,  // Width of dialog box.
         OPTION_HEIGHT = 122, // Height of dialog box.
         OPTION_X = (((320 - OPTION_WIDTH) / 2)),

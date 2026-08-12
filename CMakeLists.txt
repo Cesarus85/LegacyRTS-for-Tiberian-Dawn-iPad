@@ -39,6 +39,16 @@ option(BUILD_WITH_ASAN "Build with address sanitizer" OFF)
 option(GERMAN "Use German instead of English." OFF)
 option(FRENCH "Use French instead of English." OFF)
 
+# The iPadOS port vendors SDL2 so device and simulator builds never link the
+# Homebrew/macOS binary by accident.
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    option(IPADOS_PORT "Build the iPadOS port." ON)
+else()
+    option(IPADOS_PORT "Build the iPadOS port." OFF)
+endif()
+set(IPADOS_BUNDLE_IDENTIFIER "org.openlegacyrts.ipad" CACHE STRING "Bundle identifier for the iPadOS application")
+set(IPADOS_DEVELOPMENT_TEAM "" CACHE STRING "Apple development team used to sign the iPadOS application")
+
 if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
     option(WIN9X "Enable support for Windows 95/98/ME." OFF)
     option(DSOUND "Enable DirectSound audio. (deprecated)" OFF)
@@ -77,7 +87,9 @@ if(NOT BUILD_VANILLATD AND NOT BUILD_VANILLARA AND NOT BUILD_TESTS)
     set(OPENAL OFF)
 endif()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()
 
 include(Compilers)
 
@@ -140,10 +152,29 @@ if(SDL1)
 endif()
 
 if(SDL2)
-    message("Find path is ${CMAKE_FIND_ROOT_PATH}")
-    find_package(SDL2 REQUIRED)
-    list(APPEND VANILLA_LIBS ${SDL2_LIBRARY})
-    include_directories(${SDL2_INCLUDE_DIR})
+    if(IPADOS_PORT)
+        set(SDL_SHARED OFF CACHE BOOL "Build SDL as a shared library" FORCE)
+        set(SDL_STATIC ON CACHE BOOL "Build SDL as a static library" FORCE)
+        set(SDL_TEST OFF CACHE BOOL "Build the SDL test suite" FORCE)
+        set(SDL_TESTS OFF CACHE BOOL "Build the SDL test suite" FORCE)
+        set(SDL_INSTALL OFF CACHE BOOL "Install SDL" FORCE)
+        # Xcode 26 no longer exposes the legacy OSAtomic API to iOS apps.
+        # Clang's supported atomic builtins are available on every target.
+        set(SDL_GCC_ATOMICS ON CACHE BOOL "Use compiler atomic builtins" FORCE)
+        set(HAVE_GCC_ATOMICS 1 CACHE INTERNAL "Clang atomic builtins" FORCE)
+        # UIKit's SDL entry point is compiled as C and needs the SDK's
+        # stdint/stdlib declarations. Keep SDL on the system C library.
+        set(SDL_LIBC ON CACHE BOOL "Use the system C library" FORCE)
+        add_subdirectory(third_party/SDL2 EXCLUDE_FROM_ALL)
+        list(APPEND VANILLA_LIBS SDL2::SDL2main SDL2::SDL2-static)
+        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/SDL2/include)
+        list(APPEND VANILLA_DEFS IPADOS_PORT)
+    else()
+        message("Find path is ${CMAKE_FIND_ROOT_PATH}")
+        find_package(SDL2 REQUIRED)
+        list(APPEND VANILLA_LIBS ${SDL2_LIBRARY})
+        include_directories(${SDL2_INCLUDE_DIR})
+    endif()
 
     # winuser.h defines VK_ macros but it can be prevented
     if(WIN32)

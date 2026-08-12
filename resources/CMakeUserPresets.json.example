@@ -1,6 +1,16 @@
 {
-    "version": 2,
-    "configurePresets": [    
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "ipados-device-local",
+            "inherits": "ipados-device",
+            "displayName": "Legacy RTS — My iPad",
+            "binaryDir": "${sourceDir}/build/ipados-device",
+            "cacheVariables": {
+                "IPADOS_BUNDLE_IDENTIFIER": "com.example.legacy-rts",
+                "IPADOS_DEVELOPMENT_TEAM": "YOUR_TEAM_ID"
+            }
+        },
         {
             "name": "gcc-vanilla-debug",
             "inherits": "gcc-vanilla",
@@ -34,6 +44,22 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "ipados-device-local",
+            "configurePreset": "ipados-device-local",
+            "displayName": "Legacy RTS — My iPad (Debug)",
+            "configuration": "Debug",
+            "targets": ["VanillaTD"]
+        },
+        {
+            "name": "ipados-device-local-release",
+            "configurePreset": "ipados-device-local",
+            "displayName": "Legacy RTS — My iPad (Release)",
+            "configuration": "Release",
+            "targets": ["VanillaTD"]
         }
     ]
 }

@@ -44,8 +44,20 @@
 #include "wwmouse.h"
 #include "settings.h"
 #include "debugstring.h"
+#include "app_lifecycle.h"
 
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <cstring>
+#include <vector>
 #include <SDL.h>
+
+#ifdef IPADOS_PORT
+#include "../platform/apple/ipados_platform.h"
+#include <mach/mach.h>
+#include <sys/resource.h>
+#endif
 
 extern WWKeyboardClass* Keyboard;
 static SDL_Window* window;
@@ -53,6 +65,158 @@ static SDL_Renderer* renderer;
 static SDL_Palette* palette;
 static Uint32 pixel_format;
 static SDL_Rect render_dst;
+static int renderer_output_w;
+static int renderer_output_h;
+static int window_points_w;
+static int window_points_h;
+
+#ifdef IPADOS_PORT
+extern "C" void LegacyRTS_GetSafeAreaInsets(SDL_Window* sdl_window,
+                                              int output_width,
+                                              int output_height,
+                                              int* left,
+                                              int* top,
+                                              int* right,
+                                              int* bottom);
+extern "C" int LegacyRTS_IsLowPowerModeEnabled(void);
+extern "C" int LegacyRTS_GetThermalState(void);
+#endif
+
+#ifdef IPADOS_PORT
+namespace
+{
+std::atomic<uint32_t> pending_input_timestamp(0);
+uint64_t palette_generation = 1;
+uint64_t cursor_generation = 1;
+Uint8 previous_palette[256 * 3] = {0};
+bool has_previous_palette = false;
+bool force_present = true;
+bool render_active = true;
+bool last_frame_idle = false;
+bool low_power_mode = false;
+int thermal_state = 0;
+Uint32 power_state_checked_at = 0;
+
+struct TouchFeedbackState
+{
+    int x = 0;
+    int y = 0;
+    bool active = false;
+    bool pencil = false;
+    Uint32 expires_at = 0;
+    uint64_t generation = 1;
+};
+
+TouchFeedbackState touch_feedback;
+
+struct VideoTelemetry
+{
+    Uint32 interval_started_at = 0;
+    uint64_t attempts = 0;
+    uint64_t presents = 0;
+    uint64_t uploads = 0;
+    uint64_t unchanged_skips = 0;
+    uint64_t inactive_skips = 0;
+    double present_ms = 0.0;
+    double input_latency_ms = 0.0;
+    double max_input_latency_ms = 0.0;
+    uint64_t input_samples = 0;
+    double previous_cpu_seconds = 0.0;
+};
+
+VideoTelemetry telemetry;
+
+const char* Thermal_State_Name(int state)
+{
+    static const char* const names[] = {"nominal", "fair", "serious", "critical"};
+    return state >= 0 && state < 4 ? names[state] : "unknown";
+}
+
+void Update_Power_State()
+{
+    const Uint32 now = SDL_GetTicks();
+    if (power_state_checked_at != 0 && now - power_state_checked_at < 1000) {
+        return;
+    }
+
+    power_state_checked_at = now;
+    const bool new_low_power_mode = LegacyRTS_IsLowPowerModeEnabled() != 0;
+    const int new_thermal_state = LegacyRTS_GetThermalState();
+    if (new_low_power_mode != low_power_mode || new_thermal_state != thermal_state) {
+        low_power_mode = new_low_power_mode;
+        thermal_state = new_thermal_state;
+        DBG_INFO("iPad power policy changed: low_power=%s thermal=%s",
+                 low_power_mode ? "on" : "off",
+                 Thermal_State_Name(thermal_state));
+    }
+}
+
+double Process_CPU_Seconds()
+{
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage) != 0) {
+        return 0.0;
+    }
+    return usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1000000.0 + usage.ru_stime.tv_sec
+           + usage.ru_stime.tv_usec / 1000000.0;
+}
+
+double Resident_Megabytes()
+{
+    mach_task_basic_info_data_t info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&info), &count)
+        != KERN_SUCCESS) {
+        return 0.0;
+    }
+    return info.resident_size / (1024.0 * 1024.0);
+}
+
+void Report_Telemetry_If_Due()
+{
+    const Uint32 now = SDL_GetTicks();
+    if (telemetry.interval_started_at == 0) {
+        telemetry.interval_started_at = now;
+        telemetry.previous_cpu_seconds = Process_CPU_Seconds();
+        return;
+    }
+
+    const Uint32 elapsed_ms = now - telemetry.interval_started_at;
+    if (elapsed_ms < 5000) {
+        return;
+    }
+
+    const double elapsed_seconds = elapsed_ms / 1000.0;
+    const double cpu_seconds = Process_CPU_Seconds();
+    const double cpu_percent = elapsed_seconds > 0.0
+                                   ? (cpu_seconds - telemetry.previous_cpu_seconds) * 100.0 / elapsed_seconds
+                                   : 0.0;
+    const double average_present_ms = telemetry.presents > 0 ? telemetry.present_ms / telemetry.presents : 0.0;
+    const double average_latency_ms = telemetry.input_samples > 0
+                                          ? telemetry.input_latency_ms / telemetry.input_samples
+                                          : 0.0;
+
+    DBG_INFO("iPad perf: target=%d fps actual=%.1f uploads=%.1f/s unchanged=%llu inactive=%llu "
+             "present=%.2fms cpu=%.1f%% resident=%.1fMB touch=%.1f/%.1fms low_power=%s thermal=%s",
+             Video_Get_Effective_Frame_Limit(),
+             telemetry.presents / elapsed_seconds,
+             telemetry.uploads / elapsed_seconds,
+             static_cast<unsigned long long>(telemetry.unchanged_skips),
+             static_cast<unsigned long long>(telemetry.inactive_skips),
+             average_present_ms,
+             cpu_percent,
+             Resident_Megabytes(),
+             average_latency_ms,
+             telemetry.max_input_latency_ms,
+             low_power_mode ? "on" : "off",
+             Thermal_State_Name(thermal_state));
+
+    telemetry = VideoTelemetry();
+    telemetry.interval_started_at = now;
+    telemetry.previous_cpu_seconds = cpu_seconds;
+}
+}
+#endif
 
 static struct
 {
@@ -121,18 +285,68 @@ static void Update_HWCursor();
 
 static void Update_HWCursor_Settings()
 {
+    if (window == nullptr || renderer == nullptr || hwcursor.GameW <= 0 || hwcursor.GameH <= 0) {
+        return;
+    }
+
     /*
-    ** Update mouse scaling settings.
+    ** Renderer coordinates are drawable pixels, while SDL mouse coordinates
+    ** are UIKit points. Keep both sizes so Retina windows and Stage Manager
+    ** use the same mapping as normalized touch input.
     */
-    int win_w, win_h;
-    SDL_GetRendererOutputSize(renderer, &win_w, &win_h);
-    hwcursor.ScaleX = win_w / (float)hwcursor.GameW;
-    hwcursor.ScaleY = win_h / (float)hwcursor.GameH;
+    int previous_output_w = renderer_output_w;
+    int previous_output_h = renderer_output_h;
+    SDL_GetRendererOutputSize(renderer, &renderer_output_w, &renderer_output_h);
+    SDL_GetWindowSize(window, &window_points_w, &window_points_h);
+
+    if (renderer_output_w <= 0 || renderer_output_h <= 0 || window_points_w <= 0 || window_points_h <= 0) {
+        return;
+    }
+
+    int safe_left = 0;
+    int safe_top = 0;
+    int safe_right = 0;
+    int safe_bottom = 0;
+#ifdef IPADOS_PORT
+    LegacyRTS_GetSafeAreaInsets(window,
+                                renderer_output_w,
+                                renderer_output_h,
+                                &safe_left,
+                                &safe_top,
+                                &safe_right,
+                                &safe_bottom);
+#endif
+
+    safe_left = std::max(0, std::min(safe_left, renderer_output_w));
+    safe_top = std::max(0, std::min(safe_top, renderer_output_h));
+    safe_right = std::max(0, std::min(safe_right, renderer_output_w - safe_left));
+    safe_bottom = std::max(0, std::min(safe_bottom, renderer_output_h - safe_top));
+
+    const int available_w = std::max(1, renderer_output_w - safe_left - safe_right);
+    const int available_h = std::max(1, renderer_output_h - safe_top - safe_bottom);
 
     /*
     ** Update screen boxing settings.
     */
     float ar = (float)hwcursor.GameW / hwcursor.GameH;
+#ifdef IPADOS_PORT
+    /* The classic 640x400 surface must never be distorted on iPad. */
+    if (Settings.Video.PresentationMode == 1) {
+        const int integer_scale = std::max(1, std::min(available_w / hwcursor.GameW, available_h / hwcursor.GameH));
+        render_dst.w = hwcursor.GameW * integer_scale;
+        render_dst.h = hwcursor.GameH * integer_scale;
+    } else {
+        render_dst.w = available_w;
+        render_dst.h = static_cast<int>(render_dst.w / ar + 0.5f);
+        if (render_dst.h > available_h) {
+            render_dst.h = available_h;
+            render_dst.w = static_cast<int>(render_dst.h * ar + 0.5f);
+        }
+    }
+    render_dst.x = safe_left + (available_w - render_dst.w) / 2;
+    render_dst.y = safe_top + (available_h - render_dst.h) / 2;
+    LegacyRTS_SetCompactWindowWarning(window_points_w < 640 || window_points_h < 400);
+#else
     if (Settings.Video.Boxing) {
         size_t colonPos = Settings.Video.BoxingAspectRatio.find(":");
         std::string arW;
@@ -152,19 +366,33 @@ static void Update_HWCursor_Settings()
 
         ar = std::stof(arW) / std::stof(arH);
 
-        render_dst.w = win_w;
+        render_dst.w = renderer_output_w;
         render_dst.h = render_dst.w / ar;
-        if (render_dst.h > win_h) {
-            render_dst.h = win_h;
+        if (render_dst.h > renderer_output_h) {
+            render_dst.h = renderer_output_h;
             render_dst.w = render_dst.h * ar;
         }
-        render_dst.x = (win_w - render_dst.w) / 2;
-        render_dst.y = (win_h - render_dst.h) / 2;
+        render_dst.x = (renderer_output_w - render_dst.w) / 2;
+        render_dst.y = (renderer_output_h - render_dst.h) / 2;
     } else {
-        render_dst.w = win_w;
-        render_dst.h = win_h;
+        render_dst.w = renderer_output_w;
+        render_dst.h = renderer_output_h;
         render_dst.x = 0;
         render_dst.y = 0;
+    }
+#endif
+
+    hwcursor.ScaleX = render_dst.w / (float)hwcursor.GameW;
+    hwcursor.ScaleY = render_dst.h / (float)hwcursor.GameH;
+
+    if (previous_output_w != renderer_output_w || previous_output_h != renderer_output_h) {
+        DBG_INFO("Video layout: drawable %dx%d, viewport %dx%d at %d,%d",
+                 renderer_output_w,
+                 renderer_output_h,
+                 render_dst.w,
+                 render_dst.h,
+                 render_dst.x,
+                 render_dst.y);
     }
 
     /*
@@ -216,6 +444,12 @@ SurfaceMonitorClass& AllSurfaces = AllSurfacesDummy; // List of all direct draw 
  *=============================================================================================*/
 bool Set_Video_Mode(int w, int h, int bits_per_pixel)
 {
+#ifdef IPADOS_PORT
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+    SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight Portrait PortraitUpsideDown");
+#endif
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
     SDL_ShowCursor(SDL_DISABLE);
 
@@ -224,6 +458,11 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     int win_flags = 0;
     Uint32 requested_pixel_format = SettingsPixelFormat();
 
+#ifdef IPADOS_PORT
+    Settings.Video.Windowed = true;
+    Settings.Mouse.RawInput = false;
+    win_flags = SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+#else
     if (!Settings.Video.Windowed) {
         /*
         ** Native fullscreen if no proper width and height set.
@@ -244,6 +483,7 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         Settings.Video.WindowWidth = win_w;
         Settings.Video.WindowHeight = win_h;
     }
+#endif
 
     window =
         SDL_CreateWindow("Vanilla Conquer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, win_w, win_h, win_flags);
@@ -279,7 +519,11 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         }
     }
 
-    renderer = SDL_CreateRenderer(window, renderer_index, SDL_RENDERER_TARGETTEXTURE);
+    Uint32 renderer_flags = SDL_RENDERER_TARGETTEXTURE;
+#ifdef IPADOS_PORT
+    renderer_flags |= SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
+#endif
+    renderer = SDL_CreateRenderer(window, renderer_index, renderer_flags);
     if (renderer == nullptr) {
         DBG_ERROR("SDL_CreateRenderer failed: %s", SDL_GetError());
         Reset_Video_Mode();
@@ -355,7 +599,14 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     /*
     ** Init gamepad.
     */
-    if (Settings.Mouse.ControllerEnabled) {
+    if (Settings.Mouse.ControllerEnabled
+#ifdef IPADOS_PORT
+        || true
+#endif
+    ) {
+#ifdef IPADOS_PORT
+        Settings.Mouse.ControllerEnabled = true;
+#endif
         SDL_Init(SDL_INIT_GAMECONTROLLER);
         Keyboard->Open_Controller();
     }
@@ -365,6 +616,11 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
 
 void Toggle_Video_Fullscreen()
 {
+#ifdef IPADOS_PORT
+    /* iPadOS owns window geometry, including Stage Manager full screen. */
+    Refresh_Video_Layout();
+    return;
+#else
     Settings.Video.Windowed = !Settings.Video.Windowed;
 
     if (!Settings.Video.Windowed) {
@@ -380,6 +636,15 @@ void Toggle_Video_Fullscreen()
     }
 
     Update_HWCursor_Settings();
+#endif
+}
+
+void Refresh_Video_Layout()
+{
+#ifdef IPADOS_PORT
+    force_present = true;
+#endif
+    Update_HWCursor_Settings();
 }
 
 void Get_Video_Scale(float& x, float& y)
@@ -393,6 +658,12 @@ void Set_Video_Cursor_Clip(bool clipped)
     hwcursor.Clip = clipped;
 
     if (window) {
+#ifdef IPADOS_PORT
+        /* Pointer confinement and relative mode conflict with iPad windowing. */
+        SDL_SetWindowGrab(window, SDL_FALSE);
+        SDL_SetRelativeMouseMode(SDL_FALSE);
+        return;
+#else
         int relative;
 
         if (Settings.Video.Windowed) {
@@ -422,6 +693,7 @@ void Set_Video_Cursor_Clip(bool clipped)
             DBG_ERROR("Raw input not supported, disabling.");
             Settings.Mouse.RawInput = false;
         }
+#endif
     }
 }
 
@@ -451,13 +723,52 @@ void Get_Video_Mouse(int& x, int& y)
         x = hwcursor.X;
         y = hwcursor.Y;
     } else {
-        float scale_x, scale_y;
-        Get_Video_Scale(scale_x, scale_y);
-        SDL_GetMouseState(&x, &y);
-        x /= scale_x;
-        y /= scale_y;
+        int window_x = 0;
+        int window_y = 0;
+        SDL_GetMouseState(&window_x, &window_y);
+#ifdef IPADOS_PORT
+        Set_Video_Mouse_Window(window_x, window_y, x, y);
+#else
+        x = window_x / hwcursor.ScaleX;
+        y = window_y / hwcursor.ScaleY;
+#endif
     }
 }
+
+#ifdef IPADOS_PORT
+static void Set_Video_Mouse_Output(float pixel_x, float pixel_y, int& game_x, int& game_y)
+{
+    const float scale_x = render_dst.w > 0 ? render_dst.w / static_cast<float>(hwcursor.GameW) : 1.0f;
+    const float scale_y = render_dst.h > 0 ? render_dst.h / static_cast<float>(hwcursor.GameH) : 1.0f;
+
+    game_x = static_cast<int>((pixel_x - render_dst.x) / scale_x);
+    game_y = static_cast<int>((pixel_y - render_dst.y) / scale_y);
+    game_x = std::max(0, std::min(game_x, hwcursor.GameW - 1));
+    game_y = std::max(0, std::min(game_y, hwcursor.GameH - 1));
+    hwcursor.X = game_x;
+    hwcursor.Y = game_y;
+}
+
+void Set_Video_Mouse_Window(float window_x, float window_y, int& game_x, int& game_y)
+{
+    if (renderer_output_w <= 0 || renderer_output_h <= 0 || window_points_w <= 0 || window_points_h <= 0) {
+        Refresh_Video_Layout();
+    }
+
+    const float pixel_x = window_x * renderer_output_w / static_cast<float>(std::max(1, window_points_w));
+    const float pixel_y = window_y * renderer_output_h / static_cast<float>(std::max(1, window_points_h));
+    Set_Video_Mouse_Output(pixel_x, pixel_y, game_x, game_y);
+}
+
+void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& game_x, int& game_y)
+{
+    if (renderer_output_w <= 0 || renderer_output_h <= 0) {
+        Refresh_Video_Layout();
+    }
+
+    Set_Video_Mouse_Output(normalized_x * renderer_output_w, normalized_y * renderer_output_h, game_x, game_y);
+}
+#endif
 
 /***********************************************************************************************
  * Reset_Video_Mode -- Resets video mode and deletes Direct Draw Object                        *
@@ -574,6 +885,11 @@ void Set_Video_Cursor(void* cursor, int w, int h, int hotx, int hoty)
     hwcursor.HotX = hotx;
     hwcursor.HotY = hoty;
 
+#ifdef IPADOS_PORT
+    ++cursor_generation;
+    force_present = true;
+#endif
+
     Update_HWCursor();
 }
 
@@ -646,6 +962,13 @@ void Wait_Vert_Blank(void)
  *=============================================================================================*/
 void Set_DD_Palette(void* rpalette)
 {
+#ifdef IPADOS_PORT
+    if (has_previous_palette && std::memcmp(previous_palette, rpalette, sizeof(previous_palette)) == 0) {
+        return;
+    }
+    std::memcpy(previous_palette, rpalette, sizeof(previous_palette));
+    has_previous_palette = true;
+#endif
     SDL_Color colors[256];
 
     unsigned char* rcolors = (unsigned char*)rpalette;
@@ -663,6 +986,11 @@ void Set_DD_Palette(void* rpalette)
     colors[0].a = 0;
 
     SDL_SetPaletteColors(palette, colors, 0, 256);
+
+#ifdef IPADOS_PORT
+    ++palette_generation;
+    force_present = true;
+#endif
 
     /*
     ** Cursor needs to be updated when palette changes.
@@ -722,6 +1050,15 @@ public:
         : flags(flags)
         , windowSurface(nullptr)
         , texture(nullptr)
+#ifdef IPADOS_PORT
+        , lastPaletteGeneration(0)
+        , lastCursorGeneration(0)
+        , lastTouchFeedbackGeneration(0)
+        , lastCursorX(-1)
+        , lastCursorY(-1)
+        , hadSoftwareCursor(false)
+        , hasLastFrame(false)
+#endif
     {
         surface = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
         SDL_SetSurfacePalette(surface, palette);
@@ -794,10 +1131,69 @@ public:
         SDL_FillRect(surface, &rectSDL, color);
     }
 
-    void RenderSurface()
+    bool RenderSurface()
     {
         void* pixels;
         int pitch;
+
+#ifdef IPADOS_PORT
+        ++telemetry.attempts;
+        Update_Power_State();
+        if (touch_feedback.active
+            && static_cast<Sint32>(SDL_GetTicks() - touch_feedback.expires_at) >= 0) {
+            touch_feedback.active = false;
+            ++touch_feedback.generation;
+        }
+
+        const Uint32 window_flags = window ? SDL_GetWindowFlags(window) : 0;
+        const bool drawable = render_active && Is_App_In_Foreground() && window != nullptr && renderer != nullptr
+                              && (window_flags & (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED)) == 0;
+        if (!drawable) {
+            ++telemetry.inactive_skips;
+            last_frame_idle = true;
+            Report_Telemetry_If_Due();
+            return false;
+        }
+
+        int cursor_x = -1;
+        int cursor_y = -1;
+        const bool software_cursor = !Settings.Video.HardwareCursor && !Get_Mouse_State() && hwcursor.Surface != nullptr;
+        if (software_cursor) {
+            Get_Video_Mouse(cursor_x, cursor_y);
+        }
+
+        bool indexed_pixels_changed = !hasLastFrame;
+        if (!indexed_pixels_changed) {
+            for (int y = 0; y < surface->h; ++y) {
+                const Uint8* row = static_cast<const Uint8*>(surface->pixels) + y * surface->pitch;
+                if (std::memcmp(row, &lastIndexedPixels[y * surface->w], surface->w) != 0) {
+                    indexed_pixels_changed = true;
+                    break;
+                }
+            }
+        }
+
+        const bool visible_change = force_present || indexed_pixels_changed
+                                    || lastPaletteGeneration != palette_generation
+                                    || lastCursorGeneration != cursor_generation
+                                    || lastTouchFeedbackGeneration != touch_feedback.generation
+                                    || hadSoftwareCursor != software_cursor || lastCursorX != cursor_x
+                                    || lastCursorY != cursor_y;
+        if (!visible_change) {
+            ++telemetry.unchanged_skips;
+            last_frame_idle = true;
+            Report_Telemetry_If_Due();
+            return false;
+        }
+
+        if (indexed_pixels_changed) {
+            lastIndexedPixels.resize(surface->w * surface->h);
+            for (int y = 0; y < surface->h; ++y) {
+                const Uint8* row = static_cast<const Uint8*>(surface->pixels) + y * surface->pitch;
+                std::memcpy(&lastIndexedPixels[y * surface->w], row, surface->w);
+            }
+        }
+#endif
 
         SDL_BlitSurface(surface, NULL, windowSurface, NULL);
 
@@ -829,18 +1225,80 @@ public:
 
             Get_Video_Mouse(x, y);
 
-            dst.x = x - hwcursor.HotX;
-            dst.y = y - hwcursor.HotY;
-            dst.w = hwcursor.Surface->w;
-            dst.h = hwcursor.Surface->h;
+            const float cursor_scale = Settings.Video.LargeCursor ? 1.5f : 1.0f;
+            dst.x = x - static_cast<int>(hwcursor.HotX * cursor_scale);
+            dst.y = y - static_cast<int>(hwcursor.HotY * cursor_scale);
+            dst.w = static_cast<int>(hwcursor.Surface->w * cursor_scale);
+            dst.h = static_cast<int>(hwcursor.Surface->h * cursor_scale);
 
-            SDL_BlitSurface(hwcursor.Surface, nullptr, windowSurface, &dst);
+            if (Settings.Video.LargeCursor) {
+                SDL_BlitScaled(hwcursor.Surface, nullptr, windowSurface, &dst);
+            } else {
+                SDL_BlitSurface(hwcursor.Surface, nullptr, windowSurface, &dst);
+            }
         }
 
         SDL_UpdateTexture(texture, NULL, windowSurface->pixels, windowSurface->pitch);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, NULL, &render_dst);
+#ifdef IPADOS_PORT
+        if (touch_feedback.active) {
+            const float scale_x = render_dst.w / static_cast<float>(hwcursor.GameW);
+            const float scale_y = render_dst.h / static_cast<float>(hwcursor.GameH);
+            const int center_x = render_dst.x + static_cast<int>(touch_feedback.x * scale_x);
+            const int center_y = render_dst.y + static_cast<int>(touch_feedback.y * scale_y);
+            const int radius = (touch_feedback.pencil ? 10 : 16) * Settings.Video.TouchUIScale / 100;
+            SDL_Point ring[33];
+            for (int i = 0; i <= 32; ++i) {
+                const float angle = static_cast<float>(i) * 6.28318530718f / 32.0f;
+                ring[i].x = center_x + static_cast<int>(std::cos(angle) * radius);
+                ring[i].y = center_y + static_cast<int>(std::sin(angle) * radius);
+            }
+            if (touch_feedback.pencil) {
+                SDL_SetRenderDrawColor(renderer, 80, 210, 255, 220);
+            } else {
+                SDL_SetRenderDrawColor(renderer, 255, 220, 80, 205);
+            }
+            SDL_RenderDrawLines(renderer, ring, 33);
+            if (Settings.Video.HighContrast) {
+                for (int i = 0; i <= 32; ++i) {
+                    const float angle = static_cast<float>(i) * 6.28318530718f / 32.0f;
+                    ring[i].x = center_x + static_cast<int>(std::cos(angle) * (radius + 3));
+                    ring[i].y = center_y + static_cast<int>(std::sin(angle) * (radius + 3));
+                }
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 245);
+                SDL_RenderDrawLines(renderer, ring, 33);
+            }
+        }
+        const Uint64 present_started = SDL_GetPerformanceCounter();
+#endif
         SDL_RenderPresent(renderer);
+#ifdef IPADOS_PORT
+        const Uint64 present_finished = SDL_GetPerformanceCounter();
+        telemetry.present_ms += (present_finished - present_started) * 1000.0 / SDL_GetPerformanceFrequency();
+        ++telemetry.presents;
+        ++telemetry.uploads;
+
+        const Uint32 input_timestamp = pending_input_timestamp.exchange(0, std::memory_order_acq_rel);
+        if (input_timestamp != 0) {
+            const double latency = static_cast<Uint32>(SDL_GetTicks() - input_timestamp);
+            telemetry.input_latency_ms += latency;
+            telemetry.max_input_latency_ms = std::max(telemetry.max_input_latency_ms, latency);
+            ++telemetry.input_samples;
+        }
+
+        lastPaletteGeneration = palette_generation;
+        lastCursorGeneration = cursor_generation;
+        lastTouchFeedbackGeneration = touch_feedback.generation;
+        lastCursorX = cursor_x;
+        lastCursorY = cursor_y;
+        hadSoftwareCursor = software_cursor;
+        hasLastFrame = true;
+        force_present = false;
+        last_frame_idle = false;
+        Report_Telemetry_If_Due();
+#endif
+        return true;
     }
 
 private:
@@ -848,14 +1306,109 @@ private:
     SDL_Surface* windowSurface;
     SDL_Texture* texture;
     GBC_Enum flags;
+#ifdef IPADOS_PORT
+    std::vector<Uint8> lastIndexedPixels;
+    uint64_t lastPaletteGeneration;
+    uint64_t lastCursorGeneration;
+    uint64_t lastTouchFeedbackGeneration;
+    int lastCursorX;
+    int lastCursorY;
+    bool hadSoftwareCursor;
+    bool hasLastFrame;
+#endif
 };
 
+#ifdef IPADOS_PORT
+bool Video_Render_Frame()
+{
+    if (frontSurface) {
+        return frontSurface->RenderSurface();
+    }
+    return false;
+}
+
+void Set_Video_Render_Active(bool active)
+{
+    render_active = active;
+    if (active) {
+        force_present = true;
+        last_frame_idle = false;
+    }
+}
+
+void Video_Record_Input_Timestamp(uint32_t timestamp_ms)
+{
+    pending_input_timestamp.store(timestamp_ms != 0 ? timestamp_ms : SDL_GetTicks(), std::memory_order_release);
+    // An input event must immediately leave the 15 Hz idle cadence. This keeps
+    // the first pointer/touch response as quick as subsequent ones.
+    last_frame_idle = false;
+}
+
+void Video_Set_Touch_Feedback(int game_x, int game_y, bool pencil, bool released)
+{
+    touch_feedback.x = std::max(0, std::min(game_x, hwcursor.GameW - 1));
+    touch_feedback.y = std::max(0, std::min(game_y, hwcursor.GameH - 1));
+    touch_feedback.pencil = pencil;
+    touch_feedback.active = true;
+    touch_feedback.expires_at = SDL_GetTicks() + (released ? 180 : 1000);
+    ++touch_feedback.generation;
+    force_present = true;
+    last_frame_idle = false;
+}
+
+void Set_IPadOS_Text_Input_Rect(int game_x, int game_y, int game_w, int game_h)
+{
+    if (!window || !renderer || hwcursor.GameW <= 0 || hwcursor.GameH <= 0) {
+        return;
+    }
+
+    int window_w = 0;
+    int window_h = 0;
+    int output_w = 0;
+    int output_h = 0;
+    SDL_GetWindowSize(window, &window_w, &window_h);
+    SDL_GetRendererOutputSize(renderer, &output_w, &output_h);
+    if (window_w <= 0 || window_h <= 0 || output_w <= 0 || output_h <= 0) {
+        return;
+    }
+
+    const float game_to_output_x = render_dst.w / static_cast<float>(hwcursor.GameW);
+    const float game_to_output_y = render_dst.h / static_cast<float>(hwcursor.GameH);
+    const float output_to_window_x = window_w / static_cast<float>(output_w);
+    const float output_to_window_y = window_h / static_cast<float>(output_h);
+    SDL_Rect rect = {
+        static_cast<int>((render_dst.x + game_x * game_to_output_x) * output_to_window_x),
+        static_cast<int>((render_dst.y + game_y * game_to_output_y) * output_to_window_y),
+        std::max(1, static_cast<int>(game_w * game_to_output_x * output_to_window_x)),
+        std::max(1, static_cast<int>(game_h * game_to_output_y * output_to_window_y))};
+    SDL_SetTextInputRect(&rect);
+}
+
+int Video_Get_Effective_Frame_Limit()
+{
+    Update_Power_State();
+    if (!render_active || !Is_App_In_Foreground()) {
+        return 5;
+    }
+
+    int limit = Settings.Video.FrameLimit > 0 ? Settings.Video.FrameLimit : 60;
+    limit = std::max(15, std::min(limit, 60));
+    if (Settings.Video.BatterySaving || low_power_mode || thermal_state >= 2) {
+        limit = std::min(limit, 30);
+    }
+    if (last_frame_idle) {
+        limit = std::min(limit, 15);
+    }
+    return limit;
+}
+#else
 void Video_Render_Frame()
 {
     if (frontSurface) {
         frontSurface->RenderSurface();
     }
 }
+#endif
 
 /*
 ** Video

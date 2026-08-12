@@ -610,6 +610,15 @@ int Main_Menu(unsigned int timeout)
 #else
 
 #ifdef NEWMENU
+#ifdef IPADOS_PORT
+    TextButtonClass multibtn(BUTTON_MULTI,
+                             "Multiplayer: nicht verfuegbar",
+                             TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
+                             D_MULTI_X,
+                             starty,
+                             D_MULTI_W,
+                             D_MULTI_H);
+#else
     TextButtonClass multibtn(BUTTON_MULTI,
                              TXT_MULTIPLAYER_GAME,
                              TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
@@ -617,12 +626,22 @@ int Main_Menu(unsigned int timeout)
                              starty,
                              D_MULTI_W,
                              D_MULTI_H);
+#endif
     starty += ystep;
 
     // TextButtonClass internetbutton(BUTTON_INTERNET, TXT_INTERNET,
     //	TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
     //	D_INTERNET_X, starty, D_INTERNET_W, D_INTERNET_H);
     // starty += ystep;
+#else
+#ifdef IPADOS_PORT
+    TextButtonClass multibtn(BUTTON_MULTI,
+                             "Multiplayer: nicht verfuegbar",
+                             TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
+                             D_MULTI_X,
+                             D_MULTI_Y,
+                             D_MULTI_W,
+                             D_MULTI_H);
 #else
     TextButtonClass multibtn(BUTTON_MULTI,
                              TXT_MULTIPLAYER_GAME,
@@ -631,6 +650,7 @@ int Main_Menu(unsigned int timeout)
                              D_MULTI_Y,
                              D_MULTI_W,
                              D_MULTI_H);
+#endif
 #endif
 #endif
 
@@ -721,6 +741,11 @@ int Main_Menu(unsigned int timeout)
 
     loadbtn.Add_Tail(*commands);
     multibtn.Add_Tail(*commands);
+#ifdef IPADOS_PORT
+    // Networking stays intentionally unavailable until a native transport and
+    // an interoperability test matrix exist for the iPad release.
+    multibtn.Disable();
+#endif
     introbtn.Add_Tail(*commands);
     exitbtn.Add_Tail(*commands);
 
@@ -944,6 +969,11 @@ int Main_Menu(unsigned int timeout)
             break;
 
         case KN_RETURN:
+#ifdef IPADOS_PORT
+            if (buttons[curbutton] == &multibtn) {
+                break;
+            }
+#endif
             buttons[curbutton]->IsPressed = true;
             buttons[curbutton]->Draw_Me(true);
             retval = curbutton;

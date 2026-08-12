@@ -60,6 +60,10 @@ public:
 
     virtual int Draw_Me(int forced);
     virtual void Set_Text(char* text, int max_len);
+#ifdef IPADOS_PORT
+    virtual void Set_Focus(void);
+    virtual void Clear_Focus(void);
+#endif
     void Set_Color(int color)
     {
         Color = color;

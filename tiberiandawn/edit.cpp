@@ -41,6 +41,28 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#ifdef IPADOS_PORT
+#include "video.h"
+#include <SDL.h>
+#endif
+
+#ifdef IPADOS_PORT
+void EditClass::Set_Focus(void)
+{
+    ControlClass::Set_Focus();
+    Set_IPadOS_Text_Input_Rect(X, Y, Width, Height);
+    SDL_StartTextInput();
+}
+
+void EditClass::Clear_Focus(void)
+{
+    const bool had_focus = Has_Focus();
+    ControlClass::Clear_Focus();
+    if (had_focus) {
+        SDL_StopTextInput();
+    }
+}
+#endif
 
 /***********************************************************************************************
  * EditClass::EditClass -- Normal constructor for edit class object.                           *
@@ -267,7 +289,7 @@ int EditClass::Action(unsigned flags, KeyNumType& key)
                 /*
                 ** Filter out all special keys except return and backspace
                 */
-                if ((!(key & WWKEY_VK_BIT) && ascii >= ' ' && ascii <= 127) || key == KN_RETURN
+                if (((key & WWKEY_TEXT_BIT) && ascii >= ' ') || (!(key & WWKEY_VK_BIT) && ascii >= ' ' && ascii <= 127) || key == KN_RETURN
                     || key == KN_BACKSPACE) {
 
                     if ((!(flags & LEFTRELEASE)) && (!(flags & RIGHTRELEASE))) {
@@ -427,7 +449,8 @@ bool EditClass::Handle_Key(KeyASCIIType ascii)
         **	Invisible characters are never added to the string. This is
         **	especially true for spaces at the beginning of the string.
         */
-        if (!isgraph(ascii) && ascii != ' ')
+        const unsigned char character = static_cast<unsigned char>(ascii);
+        if (character < 0x80 && !isgraph(character) && character != ' ')
             break;
         if (ascii == ' ' && Length == 0)
             break;
@@ -436,12 +459,19 @@ bool EditClass::Handle_Key(KeyASCIIType ascii)
         **	If this is an upper case only edit gadget, then force the alphabetic
         **	character to upper case.
         */
-        if ((EditFlags & UPPERCASE) && isalpha(ascii)) {
-            ascii = (KeyASCIIType)toupper(ascii);
+        if ((EditFlags & UPPERCASE) && character < 0x80 && isalpha(character)) {
+            ascii = (KeyASCIIType)toupper(character);
+        } else if (EditFlags & UPPERCASE) {
+            if (character == 0xE4) ascii = (KeyASCIIType)0xC4; // ä -> Ä
+            if (character == 0xF6) ascii = (KeyASCIIType)0xD6; // ö -> Ö
+            if (character == 0xFC) ascii = (KeyASCIIType)0xDC; // ü -> Ü
         }
 
-        if ((!(EditFlags & NUMERIC) || !isdigit(ascii)) && (!(EditFlags & ALPHA) || !isalpha(ascii))
-            && (!(EditFlags & MISC) || isalnum(ascii)) && ascii != ' ') {
+        const bool extended_letter = static_cast<unsigned char>(ascii) >= 0x80;
+        const unsigned char filtered = static_cast<unsigned char>(ascii);
+        if ((!(EditFlags & NUMERIC) || !isdigit(filtered))
+            && (!(EditFlags & ALPHA) || (!extended_letter && !isalpha(filtered)))
+            && (!(EditFlags & MISC) || extended_letter || isalnum(filtered)) && ascii != ' ') {
             break;
         }
 

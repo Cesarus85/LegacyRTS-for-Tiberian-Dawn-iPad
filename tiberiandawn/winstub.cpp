@@ -71,7 +71,13 @@ ThemeType OldTheme = THEME_NONE;
 
 void Focus_Loss(void)
 {
+#ifdef IPADOS_PORT
+    Set_Video_Render_Active(false);
+#endif
 #ifdef SDL_BUILD
+    if (!GameInFocus) {
+        return;
+    }
     GameInFocus = false;
     Theme.Suspend();
     VQA_PauseAudio();
@@ -88,7 +94,13 @@ void Focus_Loss(void)
 
 void Focus_Restore(void)
 {
+#ifdef IPADOS_PORT
+    Set_Video_Render_Active(true);
+#endif
 #ifdef SDL_BUILD
+    if (GameInFocus) {
+        return;
+    }
     GameInFocus = true;
     VQA_ResumeAudio();
 #endif

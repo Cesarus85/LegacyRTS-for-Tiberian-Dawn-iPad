@@ -65,6 +65,17 @@ void Get_Video_Scale(float& x, float& y);
 void Set_Video_Cursor_Clip(bool clipped);
 void Move_Video_Mouse(float xrel, float yrel);
 void Get_Video_Mouse(int& x, int& y);
+void Refresh_Video_Layout();
+#ifdef IPADOS_PORT
+void Set_Video_Mouse_Window(float window_x, float window_y, int& game_x, int& game_y);
+void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& game_x, int& game_y);
+void Set_Video_Render_Active(bool active);
+void Video_Record_Input_Timestamp(uint32_t timestamp_ms);
+void Video_Set_Touch_Feedback(int game_x, int game_y, bool pencil, bool released);
+void Set_IPadOS_Text_Input_Rect(int game_x, int game_y, int game_w, int game_h);
+int Video_Get_Effective_Frame_Limit();
+bool Video_Render_Frame();
+#endif
 void Toggle_Video_Fullscreen();
 void Reset_Video_Mode();
 unsigned Get_Free_Video_Memory();

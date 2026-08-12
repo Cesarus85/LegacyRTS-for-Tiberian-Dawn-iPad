@@ -57,6 +57,9 @@
 #include "gadget.h"
 #include "filepcx.h"
 #include "wwmouse.h"
+#ifdef IPADOS_PORT
+#include "settings.h"
+#endif
 #ifdef _WIN32
 #include <io.h>
 #else
@@ -216,8 +219,29 @@ int GadgetClass::Clicked_On(KeyNumType& key, unsigned flags, int mousex, int mou
     **	before calling the associated action function. This is the typical action for
     **	buttons.
     */
+    int hit_x = X;
+    int hit_y = Y;
+    int hit_width = Width;
+    int hit_height = Height;
+#ifdef IPADOS_PORT
+    // Finger input gets a scalable minimum target (roughly the native
+    // native 44-point iPad target after the game's 2x presentation scale).
+    // Mouse, trackpad and Pencil hover retain pixel-precise hit testing.
+    if (key & KN_TOUCH_BIT) {
+        const int minimum = 24 * Settings.Video.TouchUIScale / 100;
+        if (hit_width < minimum) {
+            hit_x -= (minimum - hit_width) / 2;
+            hit_width = minimum;
+        }
+        if (hit_height < minimum) {
+            hit_y -= (minimum - hit_height) / 2;
+            hit_height = minimum;
+        }
+    }
+#endif
     if (this == StuckOn || (flags & KEYBOARD)
-        || (flags && (unsigned)(mousex - X) < (unsigned)Width && (unsigned)(mousey - Y) < (unsigned)Height)) {
+        || (flags && (unsigned)(mousex - hit_x) < (unsigned)hit_width
+            && (unsigned)(mousey - hit_y) < (unsigned)hit_height)) {
 
         return (Action(flags, key));
     }
@@ -540,16 +564,17 @@ KeyNumType GadgetClass::Input(void)
     */
     flags = 0;
     if (key) {
-        if (key == KN_LMOUSE) {
+        const KeyNumType button_key = static_cast<KeyNumType>(key & ~KN_TOUCH_BIT);
+        if (button_key == KN_LMOUSE) {
             flags |= LEFTPRESS;
         }
-        if (key == KN_RMOUSE) {
+        if (button_key == KN_RMOUSE) {
             flags |= RIGHTPRESS;
         }
-        if (key == (KN_LMOUSE | KN_RLSE_BIT)) {
+        if (button_key == (KN_LMOUSE | KN_RLSE_BIT)) {
             flags |= LEFTRELEASE;
         }
-        if (key == (KN_RMOUSE | KN_RLSE_BIT)) {
+        if (button_key == (KN_RMOUSE | KN_RLSE_BIT)) {
             flags |= RIGHTRELEASE;
         }
     }
@@ -650,6 +675,11 @@ KeyNumType GadgetClass::Input(void)
             }
         }
     }
+#ifdef IPADOS_PORT
+    // The touch-source tag is internal hit-testing metadata, not an engine key
+    // modifier. Never leak it into tactical or dialog command processing.
+    key = static_cast<KeyNumType>(key & ~KN_TOUCH_BIT);
+#endif
     return (key);
 }
 

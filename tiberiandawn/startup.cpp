@@ -40,6 +40,10 @@
 #include "common/utfargs.h"
 #include "settings.h"
 
+#ifdef IPADOS_PORT
+#include <SDL.h>
+#endif
+
 bool Read_Private_Config_Struct(FileClass& file, NewConfigType* config);
 void Print_Error_End_Exit(char* string);
 void Print_Error_Exit(char* string);
@@ -503,7 +507,11 @@ int main(int argc, char** argv)
         // AllSurfaces.Release();
         // Reset_Video_Mode();
         // Stop_Profiler();
+#ifdef IPADOS_PORT
+        exit(EXIT_SUCCESS);
+#else
         return (EXIT_SUCCESS);
+#endif
 
         if (Palette) {
             delete[] Palette;
@@ -537,7 +545,16 @@ void Prog_End(const char* why, bool fatal) // Added why and fatal parameters. ST
         GlyphX_Debug_Print(why);
     }
     if (fatal) {
+#ifdef IPADOS_PORT
+        SDL_ShowSimpleMessageBox(
+            SDL_MESSAGEBOX_ERROR,
+            "Legacy RTS - Missing Game Data",
+            "The required Command & Conquer data files are missing or incomplete.\n\n"
+            "Copy them to On My iPad/Legacy RTS/LegacyRTS/vanillatd and restart the app.",
+            nullptr);
+#else
         *((int*)0) = 0;
+#endif
     }
 
 #ifndef DEMO

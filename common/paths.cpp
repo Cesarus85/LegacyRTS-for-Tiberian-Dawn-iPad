@@ -16,6 +16,10 @@
 #include <stdlib.h>
 #include <string>
 
+#ifdef IPADOS_PORT
+#include "../platform/apple/ipados_platform.h"
+#endif
+
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -29,6 +33,16 @@ void PathsClass::Init(const char* suffix, const char* ini_name, const char* data
     if (suffix != nullptr) {
         Suffix = suffix;
     }
+
+#ifdef IPADOS_PORT
+    if (!LegacyRTS_PrepareGameData()) {
+        DBG_WARN("iPadOS game-data preparation was cancelled or failed");
+        // The engine cannot present a useful screen without original data.
+        // A later first-run choice therefore ends cleanly and the guide is
+        // shown again on the next launch.
+        exit(EXIT_SUCCESS);
+    }
+#endif
 
     // Check the argv[0] arg assuming it was passed. This may be a symlink so should be checked.
     std::string argv_path;

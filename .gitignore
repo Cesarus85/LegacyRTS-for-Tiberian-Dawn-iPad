@@ -2,3 +2,27 @@
 /CMakeUserPresets.json
 /.cache
 /.vscode
+.DS_Store
+*.xcuserstate
+xcuserdata/
+DerivedData/
+*.ipa
+*.dSYM/
+*.mobileprovision
+*.p12
+*.cer
+*.key
+*.pem
+
+# Original game data must never be committed.
+*.iso
+*.cue
+*.bin
+*.mix
+*.aud
+*.vqa
+*.sav
+autosave.ipad*
+
+# Obsolete local simulator captures can contain device information.
+/Simulator-*.png

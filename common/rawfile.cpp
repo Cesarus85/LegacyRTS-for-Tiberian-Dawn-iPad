@@ -171,7 +171,20 @@ char const* RawFileClass::Set_Name(char const* filename)
     ** if Resolve_File finds an actual file on-disk we use the real name
     ** instead.
     */
+#ifdef IPADOS_PORT
+    /*
+    ** iPadOS app-container paths contain case-sensitive system components and
+    ** an uppercase UUID. The sandbox cannot enumerate the container's parent
+    ** directories, so Resolve_File cannot repair those components after the
+    ** complete absolute path has been lowercased. Preserve the directory path
+    ** and normalize only the final filename; Resolve_File can then recover the
+    ** on-disk spelling from within the app's own accessible directory.
+    */
+    char* basename = strrchr(Filename, '/');
+    _strlwr(basename != nullptr ? basename + 1 : Filename);
+#else
     _strlwr(Filename);
+#endif
 
     /*
     ** Try to locate an existing file ignoring case, updates Filename

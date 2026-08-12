@@ -48,6 +48,7 @@
 
 extern bool DLLSave(FileClass& file);
 extern bool DLLLoad(FileClass& file);
+bool Get_Savefile_Info(const char* file_name, char* buf, unsigned* scenp, HousesType* housep);
 
 /*
 ********************************** Defines **********************************
@@ -166,16 +167,19 @@ bool Save_Game(const char* file_name, const char* descr)
 
     if (file.Write(descr_buf, DESCRIP_MAX) != DESCRIP_MAX) {
         file.Close();
+        Decode_All_Pointers();
         return (false);
     }
 
     if (file.Write(&scenario, sizeof(scenario)) != sizeof(scenario)) {
         file.Close();
+        Decode_All_Pointers();
         return (false);
     }
 
     if (file.Write(&house, sizeof(house)) != sizeof(house)) {
         file.Close();
+        Decode_All_Pointers();
         return (false);
     }
 
@@ -186,6 +190,7 @@ bool Save_Game(const char* file_name, const char* descr)
 
     if (file.Write(&version, sizeof(version)) != sizeof(version)) {
         file.Close();
+        Decode_All_Pointers();
         return (false);
     }
 
@@ -991,20 +996,26 @@ void Decode_All_Pointers(void)
  *=========================================================================*/
 bool Get_Savefile_Info(int id, char* buf, unsigned* scenp, HousesType* housep)
 {
-    CDFileClass file;
     char name[_MAX_FNAME + _MAX_EXT];
-    unsigned int version;
-    char descr_buf[DESCRIP_MAX];
 
     /*
     **	Generate the filename to load
     */
     sprintf(name, "SAVEGAME.%03d", id);
 
+    return Get_Savefile_Info(name, buf, scenp, housep);
+}
+
+bool Get_Savefile_Info(const char* file_name, char* buf, unsigned* scenp, HousesType* housep)
+{
+    CDFileClass file;
+    unsigned int version;
+    char descr_buf[DESCRIP_MAX];
+
     /*
     **	If the file opens OK, read the file
     */
-    if (file.Open(name, READ)) {
+    if (file.Open(file_name, READ)) {
 
         /*
         **	Read in the description, scenario #, and the house
@@ -1014,8 +1025,13 @@ bool Get_Savefile_Info(int id, char* buf, unsigned* scenp, HousesType* housep)
             return (false);
         }
 
-        descr_buf[strlen(descr_buf) - 2] = '\0'; // trim off CR/LF
-        strcpy(buf, descr_buf);
+        descr_buf[DESCRIP_MAX - 1] = '\0';
+        size_t description_length = strnlen(descr_buf, DESCRIP_MAX);
+        while (description_length > 0
+               && (descr_buf[description_length - 1] == '\r' || descr_buf[description_length - 1] == '\n')) {
+            descr_buf[--description_length] = '\0';
+        }
+        snprintf(buf, DESCRIP_MAX, "%s", descr_buf);
 
         if (file.Read(scenp, sizeof(unsigned)) != sizeof(unsigned)) {
             file.Close();

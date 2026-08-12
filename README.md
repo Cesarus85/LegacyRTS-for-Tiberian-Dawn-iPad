@@ -1,147 +1,163 @@
-# Vanilla Conquer
-Vanilla Conquer is a fully portable version of the first generation C&C engine and is capable of running both Tiberian Dawn and Red Alert on multiple platforms. It can also be used for mod development for the Remastered Collection.
+# Legacy RTS — for Command & Conquer: Tiberian Dawn on iPad
 
-The main focus of Vanilla Conquer is to keep the default out-of-box experience faithful to what the games were back when they were released and work as a drop-in replacement for the original executables while also providing bug fixes, compatiblity and quality of life improvements.
+> **EA has not endorsed and does not support this product.**
 
-Current project goals are tracked as [GitHub issues with the goal label](https://github.com/Vanilla-Conquer/Vanilla-Conquer/issues?q=is%3Aissue+is%3Aopen+label%3Agoal).
+**Command & Conquer: Tiberian Dawn (1995), running natively on iPadOS** through
+an unofficial, community-made engine port. Legacy RTS is based on
+[Vanilla Conquer](https://github.com/TheAssemblyArmada/Vanilla-Conquer) and the
+source code released by Electronic Arts.
 
-## Chat with us
+> **Independent modified project.** Legacy RTS is not an Electronic Arts
+> product and is not affiliated with Electronic Arts. Command & Conquer and
+> related names are Electronic Arts trademarks. They are used in plain text
+> only to identify the game this port is for and the data it is compatible with.
 
-There are rooms on multiple platforms for discussion:
+The repository contains **source code only**. It does not contain the game,
+disc images, movies, music, graphics, or other original game data. You must
+supply data from C&C Gold GDI and Nod discs that you are legally entitled to
+use.
 
-- [The Assembly Armada](https://discord.gg/UnWK2Tw) on [Discord](https://discord.gg)
-- [#vanilla-conquer:vi.fi](https://matrix.to/#/#vanilla-conquer:vi.fi) on [Matrix](https://matrix.org)
-- [#vanilla-conquer](https://web.libera.chat/?channel=#vanilla-conquer) on [Libera.Chat](https://libera.chat]) IRC network
+[Project page](docs/index.html) · [iPad build guide](README-iPadOS.md) ·
+[Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
-All of these rooms are bridged together so people can choose their preferred service. Please be nice to each other.
+## Highlights
 
-## Building
+- Native iPad window lifecycle, rotation, safe areas, and Stage Manager layout
+- Touch-first RTS controls, mouse and trackpad, hardware keyboard, controllers,
+  and Apple Pencil support
+- Guided on-device import of the GDI and Nod C&C Gold disc images
+- Files-visible manual saves plus transactional interruption recovery
+- 60 FPS presentation with a persistent 30 FPS battery mode
+- Metal-accelerated SDL rendering with full-size and pixel-perfect modes
+- iPadOS audio-session handling for interruptions and route changes
+- No analytics, accounts, advertising, or network multiplayer
 
-We support wide variety of compilers and platforms to target. Vanilla Conquer is known to compile with recent enough gcc, MSVC, mingw-w64 or clang and known to run on Windows, Linux, macOS and BSDs.
+The original campaigns, missions, videos, audio, and languages come from the
+user-supplied game data. Multiplayer is currently unavailable.
 
-### Presets
+## What this port involved
 
-A [CMakePresets.json](CMakePresets.json) file is provided that contains presets for common build configurations and is used by our CI scripts to build the release builds. These presets require the [Ninja](https://ninja-build.org/) build tool to be available in the system PATH in order to be used.
+The original engine assumes a desktop window, mouse, writable working
+directory, long-lived foreground process, and desktop audio device. The iPad
+port adds the platform behavior around that engine while preserving its game
+logic and original 640 × 400 presentation:
 
-We also provide an example [CMakeUserPresets.json](resources/CMakeUserPresets.json.example) that can be copied to the root source directory and renamed. You can edit this file to create your own development presets that won't be included in git commits. A few example presets are provided which override the release presets to build a "debug" configuration.
+- UIKit scene lifecycle and safe-area-aware SDL windows for rotation and Stage
+  Manager
+- A touch gesture state machine that distinguishes taps, selection drags,
+  two-finger map movement, long presses, cancellation, and Pencil input
+- Sandboxed paths for imported assets, settings, saves, and recovery state
+- Atomic two-disc import with validation, storage checks, and actionable errors
+- Render suspension, dirty-frame presentation, battery and thermal policies
+- iPad audio-session coordination and interruption-safe mission recovery
 
-To build using a preset, add `--preset preset_name` to the CMake command line examples below.
+This was developed as a human + AI collaboration: product direction, device
+testing, visual judgment, and release decisions are human-led; implementation,
+diagnostics, documentation, and repetitive validation were AI-assisted.
 
-### Windows
+## Current status
 
-#### Requirements
+The physical-iPad build starts, imports complete C&C Gold GDI and Nod data,
+plays campaigns and live missions, saves and resumes, rotates, and works in
+Stage Manager. Touch, Pencil, mouse/trackpad, keyboard, and controller paths are
+implemented. The app remains a source-built development project rather than an
+App Store or pre-signed IPA distribution.
 
-The following components are needed to build Vanilla Conquer executables:
+## Build for a physical iPad
 
- - [MSVC v142 C++ x86/x64 build tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
- - Windows 10 SDK
- - CMake (installable from MSVC build tools)
- - [SDL1 or SDL2 development libraries, Visual C++](https://libsdl.org/download-2.0.php)
- - [OpenAL Core SDK](https://www.openal.org/downloads/)
+Requirements:
 
-Extract SDL2 and OpenAL somewhere you know. If you are building only Remastered dlls you can skip installing SDL2 and OpenAL.
+- A Mac with Xcode and the iOS platform components installed
+- CMake 3.25 or newer
+- An Apple development team selected for code signing
+- Git with submodule support
 
-#### Building
-
-In a VS command line window in the Vanilla Conquer source directory:
-
-```sh
-cmake -DSDL2_ROOT_DIR=C:\path\to\SDL2 -DOPENAL_ROOT=C:\path\to\OpenAL -B build .
-cmake --build build
-```
-
-This will build Vanilla Conquer executables in the build directory. If you are building Remastered dlls you need to configure cmake with `-A win32` and ensure your VS command line is x86.
-
-### Linux / macOS / BSD
-
-#### Requirements
-
-- GNU C++ Compiler (g++) or Clang
-- CMake
-- SDL1 or SDL2
-- OpenAL
-
-On Debian/Ubuntu you can install the build requirements as follows:
-
-```sh
-sudo apt update
-sudo apt install g++ cmake libsdl2-dev libopenal-dev
-or
-sudo apt install g++ cmake libsdl1.2-dev libopenal-dev
-```
-
-On Fedora/RedHat based system you can install the build requirements as follows:
-
-```sh
-sudo dnf install gcc-c++ cmake SDL2-devel openal-soft-devel
-or
-sudo dnf install gcc-c++ cmake SDL-devel openal-soft-devel
-```
-
-#### Building
+Clone the project and its SDL dependency:
 
 ```sh
-cmake -B build .
-cmake --build build
+git clone --recurse-submodules YOUR_REPOSITORY_URL
+cd legacy-rts-ipad
+./scripts/prepare-ipados-dependencies.sh
 ```
 
-This will build Vanilla Conquer executables in the build directory.
+Create your private signing preset:
 
-#### macOS considerations
+```sh
+cp resources/CMakeUserPresets.json.example CMakeUserPresets.json
+```
 
-To create a portable bundle for macOS we run [macdylibbundler](https://github.com/auriamg/macdylibbundler) in our CI builds as an extra step to add the SDL2 and OpenAL libraries to the bundle. If you wish to create a portable bundle yourself, you will need to do this step manually as CMake will not currently do it for you.
+Edit the `IPADOS_BUNDLE_IDENTIFIER` and `IPADOS_DEVELOPMENT_TEAM` placeholders,
+then configure and build:
 
-### Icons
+```sh
+cmake --preset ipados-device-local
+cmake --build --preset ipados-device-local
+open build/ipados-device/VanillaConquer.xcodeproj
+```
 
-CMake will attempt to generate icons in an appropriate format for Windows and macOS if ImageMagick is found in the system PATH. Otherwise you will end up with generic "program" icons.
+In Xcode, select the `VanillaTD` scheme and your connected iPad. The detailed
+[iPadOS guide](README-iPadOS.md) covers installation, first launch, data import,
+controls, storage, and diagnostics.
 
-## Releases
+## Game-data import
 
-Binary releases of the latest commit are available from [here](https://github.com/TheAssemblyArmada/Vanilla-Conquer/releases/tag/latest), which is updated whenever new code is merged into the main branch.
+On first launch, choose the original C&C Gold **GDI and Nod ISO files together**
+in the system document picker. The app validates both discs, extracts the data
+locally, and does not retain the ISO files. A previously prepared data directory
+can be selected instead.
 
-## Running
+The importer does not support data from the Remastered Collection, The First
+Decade, or The Ultimate Collection. No game data may be submitted to this
+repository in issues, pull requests, test fixtures, or releases.
 
-### VanillaTD and VanillaRA
+## macOS status
 
-Copy the Vanilla executable (`vanillatd.exe` or `vanillara.exe`) to your legacy game directory, on Windows also copy `SDL2.dll` and `OpenAL32.dll`.
+The upstream desktop path remains available and is checked for macOS build
+portability. It is separate from the primary iPad product: the native iPad
+importer, Files integration, touch controls, and iPad lifecycle are compiled
+only for iPadOS. A portable macOS app also needs its SDL2 and OpenAL dynamic
+libraries bundled and should not be advertised as a supported release until it
+has completed a launch and gameplay smoke test.
 
-For Tiberian Dawn the final freeware Gold CD release ([GDI](https://www.moddb.com/games/cc-gold/downloads/command-conquer-gold-free-game-gdi-iso), [NOD](https://www.moddb.com/games/cc-gold/downloads/command-conquer-gold-free-game-nod-iso)) works fine.
+## Known limitations
 
-For Red Alert the freeware [CD release](https://web.archive.org/web/20080901183216/http://www.ea.com/redalert/news-detail.jsp?id=62) works fine as well.
-The official [Red Alert demo](https://www.moddb.com/games/cc-red-alert/downloads/command-conquer-red-alert-demo) is also fully playable.
-The demo supports custom skirmish maps (except interior) and includes one campaign mission for both Allied and Soviet from the retail game.
+- Multiplayer and networking are disabled.
+- Red Alert is present in the upstream source tree but is not an iPad target.
+- External-display behavior is not release-tested.
+- The macOS target compiles, but portable packaging and live gameplay still
+  need explicit release validation.
+- Original game limitations and content are unchanged; this project does not
+  provide replacement assets or translations.
 
-While it is possible to use the game data from the Remastered Collection, The Ultimate Collection or The First Decade they are currently _not_ supported.
-Any repackaged version that you may already have from any unofficial source is _not_ supported.
-If you encounter a bug that may be data related like invisible things or crashing when using a certain unit please retest with the retail data first before submitting a bug report.
+## Project lineage and credits
 
-### Remastered
+- Westwood Studios and Electronic Arts — the original game and released source
+- [Electronic Arts C&C source release](https://github.com/electronicarts/CnC_Remastered_Collection)
+- [Vanilla Conquer](https://github.com/TheAssemblyArmada/Vanilla-Conquer) — the
+  portable engine foundation used by this fork
+- SDL contributors — platform, rendering, and input foundation
+- unshieldv3 contributors — InstallShield archive extraction used by the guided
+  importer
+- Legacy RTS contributors — iPadOS integration, controls, importer, lifecycle,
+  storage, performance, and documentation
 
-The build process will produce _Vanilla_TD_ and _Vanilla_RA_ directories in your build directory if you enable them with `-DBUILD_REMASTERTD=ON` and `-DBUILD_REMASTERRA=ON`.
-These work as mods for the Remastered Collection.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for license details.
 
-To manually install a local Remastered mod, launch both games once then head to _My Documents/CnCRemastered/CnCRemastered/Mods_.
-You should see _Tiberian\_Dawn_ and _Red\_Alert_ directories.
+## Contributing
 
-#### Tiberian Dawn
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Keep changes focused, mark modified source clearly, and never include original
+game data or confidential signing material. Security reports belong in the
+private channel described in [SECURITY.md](SECURITY.md).
 
-Copy the _Vanilla_TD_ directory to the _Tiberian\_Dawn_ directory.
+## License and notices
 
-The directory structure should look like this:
+The code is distributed under GNU GPL v3 or later with the permitted additional
+terms in [License.txt](License.txt). Those additional terms include trademark,
+attribution, modification-marking, and warranty provisions. See
+[NOTICE.md](NOTICE.md) for the modification statement and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled dependencies.
 
-    My Documents/CnCRemastered/CnCRemastered/Mods/Tiberian_Dawn/Vanilla_TD/Data/TiberianDawn.dll
-    My Documents/CnCRemastered/CnCRemastered/Mods/Tiberian_Dawn/Vanilla_TD/ccmod.json
-    My Documents/CnCRemastered/CnCRemastered/Mods/Tiberian_Dawn/Vanilla_TD/GameConstants_Mod.xml
-
-You should now see the new mod in the mods list of Tiberian Dawn Remastered.
-
-#### Red Alert
-
-Copy the _Vanilla_RA_ directory to the _Red\_Alert_ directory.
-
-The directory structure should look like this:
-
-    My Documents/CnCRemastered/CnCRemastered/Mods/Red_Alert/Vanilla_RA/Data/RedAlert.dll
-    My Documents/CnCRemastered/CnCRemastered/Mods/Red_Alert/Vanilla_RA/ccmod.json
-
-You should now see the new mod in the mods list of Red Alert Remastered.
+No warranty is provided. This repository is intended for preservation,
+portability research, and lawful personal use of independently supplied game
+data.

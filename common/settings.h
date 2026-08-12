@@ -30,6 +30,11 @@ public:
         int Width;
         int Height;
         int FrameLimit;
+        bool BatterySaving;
+        int PresentationMode;
+        int TouchUIScale;
+        bool LargeCursor;
+        bool HighContrast;
         int InterpolationMode;
         bool HardwareCursor;
         bool DOSMode;

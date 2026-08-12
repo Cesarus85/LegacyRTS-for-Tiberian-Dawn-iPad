@@ -37,12 +37,22 @@
 #include "function.h"
 #include "visudlg.h"
 #include "common/framelimit.h"
+#ifdef IPADOS_PORT
+#include "common/settings.h"
+#include "common/video.h"
+#include <cstdio>
+#endif
 
 int VisualControlsClass::Init(void)
 {
     int factor = (SeenBuff.Get_Width() == 320) ? 1 : 2;
     Option_Width = 216 * factor;
-    Option_Height = 122 * factor;
+    Option_Height =
+#ifdef IPADOS_PORT
+        160 * factor;
+#else
+        122 * factor;
+#endif
     Option_X = (((SeenBuff.Get_Width() - Option_Width) / 2));
     Option_Y = ((SeenBuff.Get_Height() - Option_Height) / 2);
     Text_X = Option_X + (28 * factor);
@@ -53,7 +63,13 @@ int VisualControlsClass::Init(void)
     Slider_Height = 5 * factor;
     Slider_Y_Spacing = 11 * factor;
     Button_X = Option_X + (63 * factor);
-    Button_Y = Option_Y + (102 * factor);
+    Button_Y = Option_Y + (
+#ifdef IPADOS_PORT
+        140
+#else
+        102
+#endif
+        * factor);
     return (factor);
 }
 /***********************************************************************************************
@@ -99,6 +115,42 @@ void VisualControlsClass::Process(void)
 
     TextButtonClass resetbtn(BUTTON_RESET, TXT_RESET_MENU, TPF_6PT_GRAD | TPF_NOSHADOW, 0, Button_Y);
 
+#ifdef IPADOS_PORT
+    char presentation_text[48];
+    char scale_text[48];
+    char accessibility_text[48];
+    std::snprintf(presentation_text,
+                  sizeof(presentation_text),
+                  "Bild: %s",
+                  Settings.Video.PresentationMode ? "Pixelgenau" : "Voll");
+    std::snprintf(scale_text, sizeof(scale_text), "Touch UI: %d%%", Settings.Video.TouchUIScale);
+    std::snprintf(accessibility_text,
+                  sizeof(accessibility_text),
+                  "Lesbarkeit: %s",
+                  Settings.Video.HighContrast ? "Hoch" : "Normal");
+    TextButtonClass presentationbtn(BUTTON_IPAD_PRESENTATION,
+                                    presentation_text,
+                                    TPF_6PT_GRAD | TPF_NOSHADOW,
+                                    Option_X + 15 * factor,
+                                    Option_Y + 78 * factor,
+                                    88 * factor,
+                                    11 * factor);
+    TextButtonClass scalebtn(BUTTON_IPAD_UI_SCALE,
+                             scale_text,
+                             TPF_6PT_GRAD | TPF_NOSHADOW,
+                             Option_X + 113 * factor,
+                             Option_Y + 78 * factor,
+                             88 * factor,
+                             11 * factor);
+    TextButtonClass accessibilitybtn(BUTTON_IPAD_ACCESSIBILITY,
+                                     accessibility_text,
+                                     TPF_6PT_GRAD | TPF_NOSHADOW,
+                                     Option_X + 50 * factor,
+                                     Option_Y + 94 * factor,
+                                     116 * factor,
+                                     11 * factor);
+#endif
+
     /*
     **	Centers options button.
     */
@@ -106,6 +158,11 @@ void VisualControlsClass::Process(void)
     resetbtn.X = Option_X + (15 * factor);
 
     resetbtn.Add_Tail(optionsbtn);
+#ifdef IPADOS_PORT
+    presentationbtn.Add_Tail(optionsbtn);
+    scalebtn.Add_Tail(optionsbtn);
+    accessibilitybtn.Add_Tail(optionsbtn);
+#endif
 
     /*
     **	Brightness (value) control.
@@ -257,6 +314,39 @@ void VisualControlsClass::Process(void)
         case (BUTTON_TINT | KN_BUTTON):
             Options.Set_Tint(tint.Get_Value());
             break;
+
+#ifdef IPADOS_PORT
+        case (BUTTON_IPAD_PRESENTATION | KN_BUTTON):
+            Settings.Video.PresentationMode = Settings.Video.PresentationMode ? 0 : 1;
+            std::snprintf(presentation_text,
+                          sizeof(presentation_text),
+                          "Bild: %s",
+                          Settings.Video.PresentationMode ? "Pixelgenau" : "Voll");
+            presentationbtn.Set_Text(presentation_text, false);
+            presentationbtn.Flag_To_Redraw();
+            Refresh_Video_Layout();
+            break;
+
+        case (BUTTON_IPAD_UI_SCALE | KN_BUTTON):
+            Settings.Video.TouchUIScale = Settings.Video.TouchUIScale < 125 ? 125
+                                              : (Settings.Video.TouchUIScale < 150 ? 150 : 100);
+            std::snprintf(scale_text, sizeof(scale_text), "Touch UI: %d%%", Settings.Video.TouchUIScale);
+            scalebtn.Set_Text(scale_text, false);
+            scalebtn.Flag_To_Redraw();
+            break;
+
+        case (BUTTON_IPAD_ACCESSIBILITY | KN_BUTTON):
+            Settings.Video.HighContrast = !Settings.Video.HighContrast;
+            Settings.Video.LargeCursor = Settings.Video.HighContrast;
+            std::snprintf(accessibility_text,
+                          sizeof(accessibility_text),
+                          "Lesbarkeit: %s",
+                          Settings.Video.HighContrast ? "Hoch" : "Normal");
+            accessibilitybtn.Set_Text(accessibility_text, false);
+            accessibilitybtn.Flag_To_Redraw();
+            Refresh_Video_Layout();
+            break;
+#endif
 
         case (BUTTON_RESET | KN_BUTTON):
             selection = BUTTON_RESET;

@@ -41,6 +41,9 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#ifdef IPADOS_PORT
+#include "ipados_lifecycle.h"
+#endif
 #include "loaddlg.h"
 #include "common/gitinfo.h"
 #include "common/vqaconfig.h"
@@ -721,6 +724,9 @@ bool Select_Game(bool fade)
     int selection;           // the default selection
     bool process = true;     // false = break out of while loop
     bool display = true;
+#ifdef IPADOS_PORT
+    static bool recovery_prompted = false;
+#endif
     CountDownTimerClass count;
 
     if (Special.IsFromInstall) {
@@ -857,6 +863,24 @@ bool Select_Game(bool fade)
                     ;
                 }
             }
+#ifdef IPADOS_PORT
+            if (!recovery_prompted) {
+                recovery_prompted = true;
+                if (IPadOS_Has_Recovery_Autosave()) {
+                    if (WWMessageBox().Process("Interrupted mission found. Continue?", "Continue", "Main Menu") == 0) {
+                        if (IPadOS_Load_Recovery_Autosave()) {
+                            Theme.Queue_Song(THEME_AOI);
+                            process = false;
+                            gameloaded = true;
+                            continue;
+                        }
+                        WWMessageBox().Process(TXT_ERROR_LOADING_GAME);
+                    }
+                    IPadOS_Discard_Recovery_Autosaves();
+                    display = true;
+                }
+            }
+#endif
             /*
             **	Display menu and fetch selection from player.
             */

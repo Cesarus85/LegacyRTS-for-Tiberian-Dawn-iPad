@@ -14,28 +14,455 @@
 // with this program. If not, see https://github.com/electronicarts/CnC_Remastered_Collection
 
 #include "macros.h"
+#include "app_lifecycle.h"
+#include "ipados_touch.h"
 #include "wwkeyboard_sdl2.h"
 #include "video.h"
 #include "sdl_keymap.h"
 #include "settings.h"
 #include <cmath>
+#include <cstdint>
 #include <SDL.h>
 
 void Focus_Loss();
 void Focus_Restore();
+extern "C" void LegacyRTS_ConfigureAudioSession(void);
 void Process_Network();
+
+#ifdef IPADOS_PORT
+namespace
+{
+const int TouchSlotCount = 2;
+const int DragThresholdSquared = 12 * 12;
+const Uint32 LongPressMilliseconds = 500;
+const Uint32 TwoFingerTapMilliseconds = 300;
+
+struct TouchFingerState
+{
+    SDL_FingerID id = -1;
+    float normalized_x = 0.0f;
+    float normalized_y = 0.0f;
+    bool active = false;
+    bool pencil = false;
+};
+
+struct TouchGestureState
+{
+    TouchFingerState fingers[TouchSlotCount];
+    SDL_FingerID primary_id = -1;
+    int start_x = 0;
+    int start_y = 0;
+    int current_x = 0;
+    int current_y = 0;
+    float pan_centroid_x = 0.0f;
+    float pan_centroid_y = 0.0f;
+    float pan_travel = 0.0f;
+    float initial_finger_distance = 0.0f;
+    int initial_ui_scale = 100;
+    Uint32 started_at = 0;
+    Uint32 two_finger_started_at = 0;
+    bool left_button_down = false;
+    bool long_press_sent = false;
+    bool panning = false;
+    bool pinching = false;
+    bool suppress_until_all_released = false;
+    bool two_finger_tap_sent = false;
+};
+
+TouchGestureState TouchGesture;
+float PendingPanX = 0.0f;
+float PendingPanY = 0.0f;
+Uint32 PendingPanAt = 0;
+
+int Active_Finger_Count(void)
+{
+    int count = 0;
+    for (int i = 0; i < TouchSlotCount; ++i) {
+        if (TouchGesture.fingers[i].active) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+TouchFingerState* Find_Finger(SDL_FingerID id)
+{
+    for (int i = 0; i < TouchSlotCount; ++i) {
+        if (TouchGesture.fingers[i].active && TouchGesture.fingers[i].id == id) {
+            return &TouchGesture.fingers[i];
+        }
+    }
+    return nullptr;
+}
+
+TouchFingerState* Add_Finger(const SDL_TouchFingerEvent& event)
+{
+    for (int i = 0; i < TouchSlotCount; ++i) {
+        if (!TouchGesture.fingers[i].active) {
+            TouchGesture.fingers[i].id = event.fingerId;
+            TouchGesture.fingers[i].normalized_x = event.x;
+            TouchGesture.fingers[i].normalized_y = event.y;
+            TouchGesture.fingers[i].active = true;
+            TouchGesture.fingers[i].pencil = event.pressure >= 10.0f;
+            return &TouchGesture.fingers[i];
+        }
+    }
+    return nullptr;
+}
+
+bool Gesture_Moved_Beyond_Threshold(void)
+{
+    const int delta_x = TouchGesture.current_x - TouchGesture.start_x;
+    const int delta_y = TouchGesture.current_y - TouchGesture.start_y;
+    TouchFingerState* primary = Find_Finger(TouchGesture.primary_id);
+    const int threshold_squared = primary && primary->pencil ? 4 * 4 : DragThresholdSquared;
+    return delta_x * delta_x + delta_y * delta_y >= threshold_squared;
+}
+
+void Reset_Touch_Gesture(void)
+{
+    TouchGesture = TouchGestureState();
+}
+
+void Release_Touch_Left_Button(WWKeyboardClassSDL2& keyboard)
+{
+    if (TouchGesture.left_button_down) {
+        keyboard.Put_Touch_Mouse_Message(VK_LBUTTON, TouchGesture.current_x, TouchGesture.current_y, true);
+        TouchGesture.left_button_down = false;
+    }
+}
+
+void Cancel_Touch_Gesture(WWKeyboardClassSDL2& keyboard)
+{
+    Release_Touch_Left_Button(keyboard);
+    TouchGesture.long_press_sent = true;
+    TouchGesture.panning = false;
+    TouchGesture.suppress_until_all_released = true;
+    PendingPanX = 0.0f;
+    PendingPanY = 0.0f;
+}
+
+void Begin_Primary_Touch(const SDL_TouchFingerEvent& event)
+{
+    TouchGesture.primary_id = event.fingerId;
+    TouchGesture.started_at = SDL_GetTicks();
+    TouchGesture.long_press_sent = false;
+    TouchGesture.panning = false;
+    TouchGesture.suppress_until_all_released = false;
+    Set_Video_Mouse_Normalized(event.x, event.y, TouchGesture.start_x, TouchGesture.start_y);
+    TouchGesture.current_x = TouchGesture.start_x;
+    TouchGesture.current_y = TouchGesture.start_y;
+}
+
+void Begin_Two_Finger_Pan(WWKeyboardClassSDL2& keyboard)
+{
+    Release_Touch_Left_Button(keyboard);
+    TouchGesture.long_press_sent = true;
+    TouchGesture.panning = true;
+    TouchGesture.pan_travel = 0.0f;
+    TouchGesture.two_finger_started_at = SDL_GetTicks();
+    TouchGesture.two_finger_tap_sent = false;
+    TouchGesture.pan_centroid_x =
+        (TouchGesture.fingers[0].normalized_x + TouchGesture.fingers[1].normalized_x) * 0.5f;
+    TouchGesture.pan_centroid_y =
+        (TouchGesture.fingers[0].normalized_y + TouchGesture.fingers[1].normalized_y) * 0.5f;
+    const float dx = TouchGesture.fingers[0].normalized_x - TouchGesture.fingers[1].normalized_x;
+    const float dy = TouchGesture.fingers[0].normalized_y - TouchGesture.fingers[1].normalized_y;
+    TouchGesture.initial_finger_distance = std::sqrt(dx * dx + dy * dy);
+    TouchGesture.initial_ui_scale = Settings.Video.TouchUIScale;
+}
+
+void Handle_Touch_Down(WWKeyboardClassSDL2& keyboard, const SDL_TouchFingerEvent& event)
+{
+    if (Find_Finger(event.fingerId) != nullptr) {
+        return;
+    }
+
+    TouchFingerState* finger = Add_Finger(event);
+    if (finger == nullptr) {
+        Cancel_Touch_Gesture(keyboard);
+        return;
+    }
+
+    const int finger_count = Active_Finger_Count();
+    if (TouchGesture.suppress_until_all_released) {
+        return;
+    }
+    if (finger_count == 1) {
+        Begin_Primary_Touch(event);
+        Video_Set_Touch_Feedback(TouchGesture.current_x, TouchGesture.current_y, finger->pencil, false);
+    } else if (finger_count == 2) {
+        Begin_Two_Finger_Pan(keyboard);
+    }
+}
+
+void Handle_Touch_Motion(WWKeyboardClassSDL2& keyboard, const SDL_TouchFingerEvent& event)
+{
+    TouchFingerState* finger = Find_Finger(event.fingerId);
+    if (finger == nullptr) {
+        return;
+    }
+
+    finger->normalized_x = event.x;
+    finger->normalized_y = event.y;
+
+    if (TouchGesture.suppress_until_all_released) {
+        return;
+    }
+
+    if (TouchGesture.panning && Active_Finger_Count() == 2) {
+        const float centroid_x =
+            (TouchGesture.fingers[0].normalized_x + TouchGesture.fingers[1].normalized_x) * 0.5f;
+        const float centroid_y =
+            (TouchGesture.fingers[0].normalized_y + TouchGesture.fingers[1].normalized_y) * 0.5f;
+        const float delta_x = centroid_x - TouchGesture.pan_centroid_x;
+        const float delta_y = centroid_y - TouchGesture.pan_centroid_y;
+        const float finger_dx = TouchGesture.fingers[0].normalized_x - TouchGesture.fingers[1].normalized_x;
+        const float finger_dy = TouchGesture.fingers[0].normalized_y - TouchGesture.fingers[1].normalized_y;
+        const float distance = std::sqrt(finger_dx * finger_dx + finger_dy * finger_dy);
+        if (TouchGesture.initial_finger_distance > 0.01f
+            && std::fabs(distance - TouchGesture.initial_finger_distance) > 0.02f) {
+            TouchGesture.pinching = true;
+            TouchGesture.two_finger_tap_sent = true;
+            PendingPanX = PendingPanY = 0.0f;
+            const float ratio = distance / TouchGesture.initial_finger_distance;
+            int scale = static_cast<int>((TouchGesture.initial_ui_scale * ratio + 2.5f) / 5.0f) * 5;
+            Settings.Video.TouchUIScale = std::max(100, std::min(150, scale));
+            return;
+        }
+        if (TouchGesture.pinching) return;
+        TouchGesture.pan_centroid_x = centroid_x;
+        TouchGesture.pan_centroid_y = centroid_y;
+        TouchGesture.pan_travel += std::sqrt(delta_x * delta_x + delta_y * delta_y);
+        PendingPanX += delta_x;
+        PendingPanY += delta_y;
+        PendingPanAt = SDL_GetTicks();
+        return;
+    }
+
+    if (event.fingerId != TouchGesture.primary_id) {
+        return;
+    }
+
+    Set_Video_Mouse_Normalized(event.x, event.y, TouchGesture.current_x, TouchGesture.current_y);
+    Video_Set_Touch_Feedback(TouchGesture.current_x, TouchGesture.current_y, finger->pencil, false);
+    if (!TouchGesture.left_button_down && !TouchGesture.long_press_sent && Gesture_Moved_Beyond_Threshold()) {
+        keyboard.Put_Touch_Mouse_Message(VK_LBUTTON, TouchGesture.start_x, TouchGesture.start_y, false);
+        TouchGesture.left_button_down = true;
+        Set_Video_Mouse_Normalized(event.x, event.y, TouchGesture.current_x, TouchGesture.current_y);
+    }
+}
+
+void Handle_Touch_Up(WWKeyboardClassSDL2& keyboard, const SDL_TouchFingerEvent& event)
+{
+    TouchFingerState* finger = Find_Finger(event.fingerId);
+    if (finger == nullptr) {
+        return;
+    }
+
+    const bool cancelled = event.pressure < 0.0f;
+    if (cancelled) {
+        Cancel_Touch_Gesture(keyboard);
+    }
+
+    if (!cancelled && TouchGesture.panning && !TouchGesture.two_finger_tap_sent
+        && TouchGesture.pan_travel < 0.012f
+        && SDL_GetTicks() - TouchGesture.two_finger_started_at <= TwoFingerTapMilliseconds) {
+        int x = 0;
+        int y = 0;
+        Set_Video_Mouse_Normalized(TouchGesture.pan_centroid_x, TouchGesture.pan_centroid_y, x, y);
+        keyboard.Put_Touch_Mouse_Message(VK_RBUTTON, x, y, false);
+        keyboard.Put_Touch_Mouse_Message(VK_RBUTTON, x, y, true);
+        TouchGesture.two_finger_tap_sent = true;
+    } else if (!cancelled && !TouchGesture.panning && !TouchGesture.suppress_until_all_released
+               && event.fingerId == TouchGesture.primary_id) {
+        Set_Video_Mouse_Normalized(event.x, event.y, TouchGesture.current_x, TouchGesture.current_y);
+        if (TouchGesture.left_button_down) {
+            Release_Touch_Left_Button(keyboard);
+        } else if (!TouchGesture.long_press_sent) {
+            keyboard.Put_Touch_Mouse_Message(VK_LBUTTON, TouchGesture.current_x, TouchGesture.current_y, false);
+            keyboard.Put_Touch_Mouse_Message(VK_LBUTTON, TouchGesture.current_x, TouchGesture.current_y, true);
+        }
+    }
+
+    int feedback_x = TouchGesture.current_x;
+    int feedback_y = TouchGesture.current_y;
+    Set_Video_Mouse_Normalized(event.x, event.y, feedback_x, feedback_y);
+    Video_Set_Touch_Feedback(feedback_x, feedback_y, finger->pencil, true);
+
+    finger->active = false;
+    if (TouchGesture.panning) {
+        TouchGesture.panning = false;
+        TouchGesture.suppress_until_all_released = true;
+    }
+    if (Active_Finger_Count() == 0) {
+        Reset_Touch_Gesture();
+    }
+}
+
+void Update_Long_Press(WWKeyboardClassSDL2& keyboard)
+{
+    if (Active_Finger_Count() != 1 || TouchGesture.panning || TouchGesture.suppress_until_all_released
+        || TouchGesture.left_button_down || TouchGesture.long_press_sent || Gesture_Moved_Beyond_Threshold()
+        || SDL_GetTicks() - TouchGesture.started_at < LongPressMilliseconds) {
+        return;
+    }
+
+    keyboard.Put_Touch_Mouse_Message(VK_RBUTTON, TouchGesture.current_x, TouchGesture.current_y, false);
+    keyboard.Put_Touch_Mouse_Message(VK_RBUTTON, TouchGesture.current_x, TouchGesture.current_y, true);
+    TouchGesture.long_press_sent = true;
+}
+
+int SDLCALL Capture_Lifecycle_Event(void*, SDL_Event* event)
+{
+    switch (event->type) {
+    case SDL_APP_TERMINATING:
+        Queue_App_Lifecycle_Event(APP_LIFECYCLE_TERMINATING);
+        break;
+    case SDL_APP_LOWMEMORY:
+        Queue_App_Lifecycle_Event(APP_LIFECYCLE_LOW_MEMORY);
+        break;
+    case SDL_APP_WILLENTERBACKGROUND:
+    case SDL_APP_DIDENTERBACKGROUND:
+        Queue_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_BACKGROUND);
+        break;
+    case SDL_APP_DIDENTERFOREGROUND:
+        Queue_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_FOREGROUND);
+        break;
+    case SDL_APP_WILLENTERFOREGROUND:
+        break;
+    default:
+        break;
+    }
+    return 1;
+}
+}
+
+bool Consume_IPadOS_Touch_Pan(float& delta_x, float& delta_y)
+{
+    if (PendingPanAt == 0 || SDL_GetTicks() - PendingPanAt > 100) {
+        Discard_IPadOS_Touch_Pan();
+        return false;
+    }
+
+    delta_x = PendingPanX;
+    delta_y = PendingPanY;
+    PendingPanX = 0.0f;
+    PendingPanY = 0.0f;
+    return delta_x != 0.0f || delta_y != 0.0f;
+}
+
+void Discard_IPadOS_Touch_Pan(void)
+{
+    PendingPanX = 0.0f;
+    PendingPanY = 0.0f;
+    PendingPanAt = 0;
+}
+
+bool Is_Text_Producing_Scancode(SDL_Scancode scancode)
+{
+    return (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_0)
+           || (scancode >= SDL_SCANCODE_MINUS && scancode <= SDL_SCANCODE_SLASH)
+           || (scancode >= SDL_SCANCODE_KP_DIVIDE && scancode <= SDL_SCANCODE_KP_PERIOD)
+           || scancode == SDL_SCANCODE_SPACE || scancode == SDL_SCANCODE_NONUSBACKSLASH
+           || scancode == SDL_SCANCODE_KP_EQUALS;
+}
+
+uint32_t Decode_UTF8_Character(const char*& text)
+{
+    const unsigned char first = static_cast<unsigned char>(*text++);
+    if (first < 0x80) {
+        return first;
+    }
+
+    int continuation_count = 0;
+    uint32_t codepoint = 0;
+    if ((first & 0xE0) == 0xC0) {
+        continuation_count = 1;
+        codepoint = first & 0x1F;
+    } else if ((first & 0xF0) == 0xE0) {
+        continuation_count = 2;
+        codepoint = first & 0x0F;
+    } else if ((first & 0xF8) == 0xF0) {
+        continuation_count = 3;
+        codepoint = first & 0x07;
+    } else {
+        return 0;
+    }
+
+    for (int i = 0; i < continuation_count; ++i) {
+        const unsigned char next = static_cast<unsigned char>(*text);
+        if ((next & 0xC0) != 0x80) {
+            return 0;
+        }
+        ++text;
+        codepoint = (codepoint << 6) | (next & 0x3F);
+    }
+    return codepoint;
+}
+
+unsigned char Legacy_Character_From_Unicode(uint32_t codepoint)
+{
+    // The original Gold assets use an 8-bit character set. Latin-1 retains
+    // German umlauts and ß; a few common smart punctuation marks are folded.
+    if (codepoint >= 0x20 && codepoint <= 0xFF) {
+        return static_cast<unsigned char>(codepoint);
+    }
+    switch (codepoint) {
+    case 0x2018:
+    case 0x2019:
+        return '\'';
+    case 0x201C:
+    case 0x201D:
+        return '"';
+    case 0x2013:
+    case 0x2014:
+        return '-';
+    case 0x2026:
+        return '.';
+    default:
+        return 0;
+    }
+}
+
+void Queue_Text_Input(WWKeyboardClassSDL2& keyboard, const char* text)
+{
+    while (text && *text) {
+        const uint32_t codepoint = Decode_UTF8_Character(text);
+        const unsigned char character = Legacy_Character_From_Unicode(codepoint);
+        if (character != 0) {
+            keyboard.Put_Text_Character(character);
+        }
+    }
+}
+#endif
+
+WWKeyboardClassSDL2::WWKeyboardClassSDL2()
+{
+}
 
 WWKeyboardClassSDL2::~WWKeyboardClassSDL2()
 {
+#ifdef IPADOS_PORT
+    if (LifecycleWatchInstalled) {
+        SDL_DelEventWatch(Capture_Lifecycle_Event, nullptr);
+    }
+#endif
 }
 
 void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
 {
+#ifdef IPADOS_PORT
+    if (!LifecycleWatchInstalled) {
+        SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+        SDL_AddEventWatch(Capture_Lifecycle_Event, nullptr);
+        LifecycleWatchInstalled = true;
+    }
+#endif
 #ifdef NETWORKING
     Process_Network();
 #endif
     SDL_Event event;
-
     while (!Is_Buffer_Full() && SDL_PollEvent(&event)) {
         unsigned short key;
         switch (event.type) {
@@ -43,17 +470,69 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
             exit(0);
             break;
         case SDL_KEYDOWN:
+#ifdef IPADOS_PORT
+            if (!SDL_IsTextInputActive() || !Is_Text_Producing_Scancode(event.key.keysym.scancode)) {
+                Put_Key_Message(event.key.keysym.scancode, false);
+            }
+#else
             Put_Key_Message(event.key.keysym.scancode, false);
+#endif
             break;
         case SDL_KEYUP:
+#ifdef IPADOS_PORT
+            if (SDL_IsTextInputActive() && Is_Text_Producing_Scancode(event.key.keysym.scancode)) {
+                break;
+            }
+#endif
             if (event.key.keysym.scancode == SDL_SCANCODE_RETURN && Down(VK_MENU)) {
                 Toggle_Video_Fullscreen();
             } else {
                 Put_Key_Message(event.key.keysym.scancode, true);
             }
             break;
+#ifdef IPADOS_PORT
+        case SDL_USEREVENT:
+            if (event.user.code == IPADOS_EVENT_PENCIL_HOVER) {
+                const float normalized_x = static_cast<float>(reinterpret_cast<uintptr_t>(event.user.data1)) / 1000000.0f;
+                const float normalized_y = static_cast<float>(reinterpret_cast<uintptr_t>(event.user.data2)) / 1000000.0f;
+                int x = 0;
+                int y = 0;
+                Set_Video_Mouse_Normalized(normalized_x, normalized_y, x, y);
+                Video_Set_Touch_Feedback(x, y, true, false);
+                Video_Record_Input_Timestamp(event.user.timestamp);
+            } else if (event.user.code == IPADOS_EVENT_PENCIL_DOUBLE_TAP) {
+                int x = 0;
+                int y = 0;
+                Get_Video_Mouse(x, y);
+                Put_Touch_Mouse_Message(VK_RBUTTON, x, y, false);
+                Put_Touch_Mouse_Message(VK_RBUTTON, x, y, true);
+                Video_Set_Touch_Feedback(x, y, true, true);
+            } else if (event.user.code == IPADOS_EVENT_PENCIL_SQUEEZE) {
+                Put_Key_Message(SDL_SCANCODE_ESCAPE, false);
+                Put_Key_Message(SDL_SCANCODE_ESCAPE, true);
+            } else if (event.user.code == IPADOS_EVENT_AUDIO_PAUSE) {
+                Focus_Loss();
+            } else if (event.user.code == IPADOS_EVENT_AUDIO_RESUME
+                       || event.user.code == IPADOS_EVENT_AUDIO_ROUTE_CHANGED) {
+                LegacyRTS_ConfigureAudioSession();
+                Focus_Restore();
+            }
+            break;
+        case SDL_TEXTINPUT:
+            Queue_Text_Input(*this, event.text.text);
+            break;
+#endif
         case SDL_MOUSEMOTION:
+#ifdef IPADOS_PORT
+            Video_Record_Input_Timestamp(event.motion.timestamp);
+            if (!Is_Gamepad_Active()) {
+                int x = 0;
+                int y = 0;
+                Set_Video_Mouse_Window(event.motion.x, event.motion.y, x, y);
+            }
+#else
             Move_Video_Mouse(static_cast<float>(event.motion.xrel), static_cast<float>(event.motion.yrel));
+#endif
             break;
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP: {
@@ -72,6 +551,10 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
                 break;
             }
 
+#ifdef IPADOS_PORT
+            Video_Record_Input_Timestamp(event.button.timestamp);
+            Set_Video_Mouse_Window(event.button.x, event.button.y, x, y);
+#else
             if (Settings.Mouse.RawInput || Is_Gamepad_Active()) {
                 Get_Video_Mouse(x, y);
             } else {
@@ -80,11 +563,46 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
                 x = event.button.x / scale_x;
                 y = event.button.y / scale_y;
             }
+#endif
 
             Put_Mouse_Message(key, x, y, event.type == SDL_MOUSEBUTTONDOWN ? false : true);
         } break;
+#ifdef IPADOS_PORT
+        case SDL_FINGERDOWN:
+            Video_Record_Input_Timestamp(event.tfinger.timestamp);
+            Handle_Touch_Down(*this, event.tfinger);
+            break;
+        case SDL_FINGERMOTION:
+            Video_Record_Input_Timestamp(event.tfinger.timestamp);
+            Handle_Touch_Motion(*this, event.tfinger);
+            break;
+        case SDL_FINGERUP:
+            Video_Record_Input_Timestamp(event.tfinger.timestamp);
+            Handle_Touch_Up(*this, event.tfinger);
+            break;
+        case SDL_APP_TERMINATING:
+            Queue_App_Lifecycle_Event(APP_LIFECYCLE_TERMINATING);
+            break;
+        case SDL_APP_LOWMEMORY:
+            Queue_App_Lifecycle_Event(APP_LIFECYCLE_LOW_MEMORY);
+            break;
+        case SDL_APP_WILLENTERBACKGROUND:
+        case SDL_APP_DIDENTERBACKGROUND:
+            Queue_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_BACKGROUND);
+            break;
+        case SDL_APP_DIDENTERFOREGROUND:
+            Queue_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_FOREGROUND);
+            break;
+        case SDL_APP_WILLENTERFOREGROUND:
+            break;
+#endif
         case SDL_WINDOWEVENT:
             switch (event.window.event) {
+            case SDL_WINDOWEVENT_RESIZED:
+            case SDL_WINDOWEVENT_SIZE_CHANGED:
+            case SDL_WINDOWEVENT_DISPLAY_CHANGED:
+                Refresh_Video_Layout();
+                break;
             case SDL_WINDOWEVENT_EXPOSED:
             case SDL_WINDOWEVENT_RESTORED:
             case SDL_WINDOWEVENT_FOCUS_GAINED:
@@ -98,6 +616,9 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
             }
             break;
         case SDL_MOUSEWHEEL:
+#ifdef IPADOS_PORT
+            Video_Record_Input_Timestamp(event.wheel.timestamp);
+#endif
             if (event.wheel.y > 0) { // scroll up
                 Put_Key_Message(VK_MOUSEWHEEL_UP, false);
             } else if (event.wheel.y < 0) { // scroll down
@@ -110,12 +631,14 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
                 if (removedController == GameController) {
                     SDL_GameControllerClose(GameController);
                     GameController = nullptr;
+                    Open_Controller();
                 }
             }
             break;
         case SDL_CONTROLLERDEVICEADDED:
             if (GameController == nullptr) {
                 GameController = SDL_GameControllerOpen(event.jdevice.which);
+                LastControllerTime = SDL_GetTicks();
             }
             break;
         case SDL_CONTROLLERAXISMOTION:
@@ -130,6 +653,31 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
     if (Is_Gamepad_Active()) {
         Process_Controller_Axis_Motion();
     }
+
+#ifdef IPADOS_PORT
+    Update_Long_Press(*this);
+
+    const uint32_t lifecycle_events = Consume_App_Lifecycle_Events();
+
+    if (lifecycle_events & APP_LIFECYCLE_LOW_MEMORY) {
+        Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_LOW_MEMORY);
+    }
+
+    if (lifecycle_events & APP_LIFECYCLE_TERMINATING) {
+        Cancel_Touch_Gesture(*this);
+        Reset_Touch_Gesture();
+        Focus_Loss();
+        Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_TERMINATING);
+    } else if (lifecycle_events & APP_LIFECYCLE_ENTERED_BACKGROUND) {
+        Cancel_Touch_Gesture(*this);
+        Reset_Touch_Gesture();
+        Focus_Loss();
+        Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_BACKGROUND);
+    } else if (lifecycle_events & APP_LIFECYCLE_ENTERED_FOREGROUND) {
+        Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_FOREGROUND);
+        Focus_Restore();
+    }
+#endif
 }
 
 bool WWKeyboardClassSDL2::Is_Gamepad_Active()
@@ -139,16 +687,24 @@ bool WWKeyboardClassSDL2::Is_Gamepad_Active()
 
 void WWKeyboardClassSDL2::Open_Controller()
 {
+    if (GameController != nullptr && SDL_GameControllerGetAttached(GameController)) {
+        return;
+    }
+    GameController = nullptr;
     for (int i = 0; i < SDL_NumJoysticks(); ++i) {
         if (SDL_IsGameController(i)) {
             GameController = SDL_GameControllerOpen(i);
+            if (GameController != nullptr) {
+                LastControllerTime = SDL_GetTicks();
+                break;
+            }
         }
     }
 }
 
 void WWKeyboardClassSDL2::Close_Controller()
 {
-    if (SDL_GameControllerGetAttached(GameController)) {
+    if (GameController != nullptr) {
         SDL_GameControllerClose(GameController);
         GameController = nullptr;
     }
@@ -175,6 +731,9 @@ void WWKeyboardClassSDL2::Process_Controller_Axis_Motion()
 
 void WWKeyboardClassSDL2::Handle_Controller_Axis_Event(const SDL_ControllerAxisEvent& motion)
 {
+#ifdef IPADOS_PORT
+    Video_Record_Input_Timestamp(motion.timestamp);
+#endif
     AnalogScrollActive = false;
     ScrollDirType directionX = SDIR_NONE;
     ScrollDirType directionY = SDIR_NONE;
@@ -236,6 +795,9 @@ void WWKeyboardClassSDL2::Handle_Controller_Axis_Event(const SDL_ControllerAxisE
 
 void WWKeyboardClassSDL2::Handle_Controller_Button_Event(const SDL_ControllerButtonEvent& button)
 {
+#ifdef IPADOS_PORT
+    Video_Record_Input_Timestamp(button.timestamp);
+#endif
     bool keyboardPress = false;
     bool mousePress = false;
     unsigned short key;
@@ -315,6 +877,9 @@ unsigned char WWKeyboardClassSDL2::Get_Scroll_Direction()
 
 KeyASCIIType WWKeyboardClassSDL2::To_ASCII(unsigned short key)
 {
+    if (key & WWKEY_TEXT_BIT) {
+        return static_cast<KeyASCIIType>(key & 0xFF);
+    }
     if (key & WWKEY_RLS_BIT) {
         return KA_NONE;
     }

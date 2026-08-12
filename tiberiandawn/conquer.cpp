@@ -59,6 +59,12 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#ifdef IPADOS_PORT
+#include "ipados_lifecycle.h"
+#include "common/ipados_touch.h"
+#include <SDL.h>
+#include <cmath>
+#endif
 #include "common/irandom.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -305,6 +311,9 @@ void Main_Game(int argc, char* argv[])
 #endif
         Set_Video_Cursor_Clip(false);
         InMainLoop = false;
+#ifdef IPADOS_PORT
+        IPadOS_Discard_Recovery_Autosaves();
+#endif
 
         if (!GameStatisticsPacketSent && PacketLater) {
             Send_Statistics_Packet();
@@ -1561,6 +1570,28 @@ bool Main_Loop()
     ** Call the focus loss handler
     */
     Check_For_Focus_Loss();
+
+#ifdef IPADOS_PORT
+    if (!GameInFocus) {
+        SDL_Delay(16);
+        return false;
+    }
+
+    float touch_pan_x = 0.0f;
+    float touch_pan_y = 0.0f;
+    if (Consume_IPadOS_Touch_Pan(touch_pan_x, touch_pan_y)) {
+        const int horizontal_pixels = static_cast<int>(std::round(std::abs(touch_pan_x) * SeenBuff.Get_Width()));
+        const int vertical_pixels = static_cast<int>(std::round(std::abs(touch_pan_y) * SeenBuff.Get_Height()));
+        if (horizontal_pixels > 0) {
+            int distance = Pixel_To_Lepton(horizontal_pixels);
+            Map.Scroll_Map(touch_pan_x > 0.0f ? DIR_W : DIR_E, distance, true);
+        }
+        if (vertical_pixels > 0) {
+            int distance = Pixel_To_Lepton(vertical_pixels);
+            Map.Scroll_Map(touch_pan_y > 0.0f ? DIR_N : DIR_S, distance, true);
+        }
+    }
+#endif
 
     /*
     ** Allocate extra memory for uncompressed shapes as needed
