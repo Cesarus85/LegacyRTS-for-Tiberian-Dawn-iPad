@@ -12,13 +12,22 @@ source code released by Electronic Arts.
 > and related names are Electronic Arts trademarks. They are used in plain text
 > only to identify the game this port is for and the data it is compatible with.
 
-The repository contains **source code only**. It does not contain the game,
-disc images, movies, music, graphics, or other original game data. You must
-supply data from C&C Gold GDI and Nod discs that you are legally entitled to
-use.
+The repository contains **source code and project presentation media only**.
+It does not contain the game, disc images, or any original data files needed to
+run it. You must supply data from C&C Gold GDI and Nod discs that you are
+legally entitled to use.
 
 [Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad/) · [iPad build guide](README-iPadOS.md) ·
 [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
+
+## Gameplay on iPad
+
+[![Tiberian Dawn running on an iPad](docs/assets/tiberian-dawn-ipad-gameplay.jpg)](https://cesarus85.github.io/Tiberian-Dawn-for-iPad/#gameplay)
+
+[Watch the 63-second gameplay video](https://cesarus85.github.io/Tiberian-Dawn-for-iPad/#gameplay),
+including launch, menus, a mission briefing, and touch-driven gameplay on a
+physical iPad. The preview uses game data supplied by the device owner; no
+original game data is distributed with this repository.
 
 ## Highlights
 

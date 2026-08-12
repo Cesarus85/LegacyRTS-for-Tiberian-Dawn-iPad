@@ -58,6 +58,14 @@ h1 span { display: block; color: transparent; -webkit-text-stroke: 1px var(--aci
 .reticle { position: absolute; left: 56%; top: 41%; width: 62px; aspect-ratio: 1; translate: -50% -50%; border: 1px solid var(--amber); border-radius: 50%; }
 .reticle::before, .reticle::after { content: ""; position: absolute; background: var(--amber); }.reticle::before { width: 1px; height: 82px; left: 30px; top: -11px; }.reticle::after { width: 82px; height: 1px; left: -11px; top: 30px; }
 .terrain { position: absolute; border: 1px dashed #4a5a50; opacity: .55; rotate: -9deg; }.t1 { width: 32%; height: 20%; left: 9%; top: 13%; }.t2 { width: 25%; height: 16%; right: 9%; bottom: 10%; }
+.gameplay { max-width: var(--max); margin: 0 auto; padding: 0 1.25rem 5rem; scroll-margin-top: 110px; }
+.gameplay-heading { display: grid; grid-template-columns: 1.35fr .65fr; gap: 3rem; align-items: end; margin-bottom: 2rem; }
+.gameplay-heading h2 { margin-bottom: 0; }
+.gameplay-heading > p { margin: 0 0 .45rem; color: var(--muted); font-family: system-ui, sans-serif; }
+.video-shell { position: relative; overflow: hidden; border: 1px solid #38453e; border-radius: 12px; background: #000; box-shadow: 0 35px 90px #000; }
+.video-shell::before { content: "IPAD // LIVE CAPTURE"; position: absolute; top: .75rem; left: .85rem; z-index: 1; padding: .3rem .5rem; border: 1px solid rgb(198 239 91 / 45%); background: rgb(8 11 10 / 85%); color: var(--acid); font-size: .58rem; letter-spacing: .1em; pointer-events: none; }
+.video-shell video { display: block; width: 100%; height: auto; aspect-ratio: 1280 / 882; object-fit: contain; }
+.gameplay-note { margin: 1rem 0 0; color: var(--muted); font-size: .7rem; }
 .status { display: grid; grid-template-columns: repeat(4, 1fr); max-width: var(--max); margin: 0 auto; border: 1px solid var(--line); }
 .status div { padding: 1.3rem; border-right: 1px solid var(--line); }.status div:last-child { border: 0; }
 .status strong, .status span { display: block; }.status strong { color: var(--acid); font-size: .85rem; }.status span { margin-top: .3rem; color: var(--muted); font-size: .68rem; }
@@ -94,6 +102,7 @@ footer { display: grid; grid-template-columns: 1fr 1.3fr; gap: 1rem 4rem; paddin
   nav { display: none; }
   .hero { grid-template-columns: 1fr; min-height: auto; padding-top: 5rem; }
   .command-display { max-width: 680px; }
+  .gameplay-heading { grid-template-columns: 1fr; gap: 1rem; }
   .status { grid-template-columns: repeat(2, 1fr); margin-inline: 1.25rem; }.status div:nth-child(2) { border-right: 0; }.status div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
   .split, .build { grid-template-columns: 1fr; gap: 2rem; }.sticky-heading { position: static; }.build .text-link { grid-column: 1; }
