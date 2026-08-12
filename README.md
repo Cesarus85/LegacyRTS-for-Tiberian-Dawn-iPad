@@ -66,41 +66,29 @@ Stage Manager. Touch, Pencil, mouse/trackpad, keyboard, and controller paths are
 implemented. The app remains a source-built development project rather than an
 App Store or pre-signed IPA distribution.
 
-## Build for a physical iPad
+## Open in Xcode and run on a physical iPad
 
 Requirements:
 
 - A Mac with Xcode and the iOS platform components installed
 - CMake 3.25 or newer
-- An Apple development team selected for code signing
-- Git with submodule support
+- A free or paid Apple ID available in Xcode for personal-device signing
 
-Clone the project and its SDL dependency:
+Download the source archive or clone the repository. On the Mac, double-click:
 
-```sh
-git clone --recurse-submodules https://github.com/Cesarus85/Tiberian-Dawn-for-iPad.git
-cd Tiberian-Dawn-for-iPad
-./scripts/prepare-ipados-dependencies.sh
+```text
+Open Tiberian Dawn for iPad.command
 ```
 
-Create your private signing preset:
+The setup verifies Xcode and CMake, retrieves only the project-pinned official
+SDL2 revision when it is missing, applies the checked-in iPad patch, generates
+the current Xcode project, and opens it. It does not request administrator
+access, install packages, alter Apple credentials, or access game data.
 
-```sh
-cp resources/CMakeUserPresets.json.example CMakeUserPresets.json
-```
-
-Edit the `IPADOS_BUNDLE_IDENTIFIER` and `IPADOS_DEVELOPMENT_TEAM` placeholders,
-then configure and build:
-
-```sh
-cmake --preset ipados-device-local
-cmake --build --preset ipados-device-local
-open build/ipados-device/TiberianDawnForiPad.xcodeproj
-```
-
-In Xcode, select the `TiberianDawn` scheme and your connected iPad. The detailed
-[iPadOS guide](README-iPadOS.md) covers installation, first launch, data import,
-controls, storage, and diagnostics.
+In Xcode, select the `TiberianDawn` scheme, choose your Apple Development Team
+under Signing & Capabilities, select the connected iPad, and press Run. The
+detailed [iPadOS guide](README-iPadOS.md) also covers the manual developer
+workflow, first launch, data import, controls, storage, and diagnostics.
 
 ## Game-data import
 
