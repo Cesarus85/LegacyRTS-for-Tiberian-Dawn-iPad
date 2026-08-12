@@ -1,4 +1,4 @@
-# Legacy RTS — iPadOS port
+# Tiberian Dawn for iPad — iPadOS port
 
 This is a modified, work-in-progress iPadOS port based on Vanilla Conquer. It is
 not an Electronic Arts product and is not affiliated with or endorsed by
@@ -30,7 +30,7 @@ Copy the private user-preset template once:
 cp resources/CMakeUserPresets.json.example CMakeUserPresets.json
 ```
 
-Edit `CMakeUserPresets.json` and replace `com.example.legacy-rts` and
+Edit `CMakeUserPresets.json` and replace `com.example.tiberian-dawn-for-ipad` and
 `YOUR_TEAM_ID`. This ignored file keeps personal signing information out of the
 public repository. Then prepare the SDL dependency and configure:
 
@@ -42,14 +42,14 @@ cmake --preset ipados-device-local
 Then open:
 
 ```text
-build/ipados-device/VanillaConquer.xcodeproj
+build/ipados-device/TiberianDawnForiPad.xcodeproj
 ```
 
-Select the `VanillaTD` scheme and `iPad von Stefan`. Signing is managed
+Select the `TiberianDawn` scheme and `iPad von Stefan`. Signing is managed
 automatically with the development team stored in the CMake cache.
 
 The generated Xcode project deliberately places simulator and device app
-products under `/private/tmp/LegacyRTS-iPad-*-Products`. This prevents iCloud
+products under `/private/tmp/TiberianDawnForiPad-iPad-*-Products`. This prevents iCloud
 Drive/File Provider metadata on a project stored in Documents from invalidating
 Xcode's code signature. The source and Xcode project remain in this repository.
 
@@ -66,11 +66,11 @@ for a previously prepared data directory. The import is validated and committed
 atomically. Immutable assets are stored privately in:
 
 ```text
-Library/Application Support/LegacyRTS/vanillatd/
+Library/Application Support/TiberianDawnForiPad/vanillatd/
 ```
 
 Settings, manual saves, and rotating recovery saves remain visible through
-Files below `Documents/LegacyRTS/vanillatd`. Remastered Collection, Ultimate
+Files below `Documents/TiberianDawnForiPad/vanillatd`. Remastered Collection, Ultimate
 Collection, and First Decade data are not supported by this importer.
 
 The first-launch guide names the expected ISO files, illustrates the joint

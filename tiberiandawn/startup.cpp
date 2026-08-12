@@ -548,9 +548,9 @@ void Prog_End(const char* why, bool fatal) // Added why and fatal parameters. ST
 #ifdef IPADOS_PORT
         SDL_ShowSimpleMessageBox(
             SDL_MESSAGEBOX_ERROR,
-            "Legacy RTS - Missing Game Data",
+            "Tiberian Dawn for iPad - Missing Game Data",
             "The required Command & Conquer data files are missing or incomplete.\n\n"
-            "Copy them to On My iPad/Legacy RTS/LegacyRTS/vanillatd and restart the app.",
+            "Copy them to On My iPad/Tiberian Dawn for iPad/TiberianDawnForiPad/vanillatd and restart the app.",
             nullptr);
 #else
         *((int*)0) = 0;

@@ -6,7 +6,7 @@ index df3ff0f..3df999e 100644
  
  #import <UIKit/UIKit.h>
  
-+/* Legacy RTS alteration: backport SDL 3's UIScene entry point for iPadOS. */
++/* Tiberian Dawn for iPad alteration: backport SDL 3's UIScene entry point for iPadOS. */
 +
  @interface SDLLaunchScreenController : UIViewController
  
@@ -33,7 +33,7 @@ index 31b114a..4ac4bef 100644
  
  #include "../../events/SDL_events_c.h"
  
-+/* Legacy RTS alteration: backport SDL 3's UIScene lifecycle for modern iPadOS windows. */
++/* Tiberian Dawn for iPad alteration: backport SDL 3's UIScene lifecycle for modern iPadOS windows. */
 +
  #if !TARGET_OS_TV
  #include <AvailabilityVersions.h>
@@ -43,41 +43,41 @@ index 31b114a..4ac4bef 100644
  static int exit_status;
  
 +#if !TARGET_OS_TV
-+/* Legacy RTS alteration: keep a short iPadOS background task alive while the
++/* Tiberian Dawn for iPad alteration: keep a short iPadOS background task alive while the
 + * engine serializes an autosave in its normal event-pump context. */
-+static UIBackgroundTaskIdentifier LegacyRTSBackgroundTask;
-+static BOOL LegacyRTSBackgroundTaskActive = NO;
++static UIBackgroundTaskIdentifier TiberianDawnForiPadBackgroundTask;
++static BOOL TiberianDawnForiPadBackgroundTaskActive = NO;
 +
-+void LegacyRTS_BeginBackgroundTask(void)
++void TiberianDawnForiPad_BeginBackgroundTask(void)
 +{
-+    if (LegacyRTSBackgroundTaskActive) {
++    if (TiberianDawnForiPadBackgroundTaskActive) {
 +        return;
 +    }
 +
-+    LegacyRTSBackgroundTaskActive = YES;
-+    LegacyRTSBackgroundTask = [[UIApplication sharedApplication]
-+        beginBackgroundTaskWithName:@"LegacyRTSAutosave"
++    TiberianDawnForiPadBackgroundTaskActive = YES;
++    TiberianDawnForiPadBackgroundTask = [[UIApplication sharedApplication]
++        beginBackgroundTaskWithName:@"TiberianDawnForiPadAutosave"
 +                  expirationHandler:^{
-+                      UIBackgroundTaskIdentifier task = LegacyRTSBackgroundTask;
-+                      LegacyRTSBackgroundTaskActive = NO;
++                      UIBackgroundTaskIdentifier task = TiberianDawnForiPadBackgroundTask;
++                      TiberianDawnForiPadBackgroundTaskActive = NO;
 +                      if (task != UIBackgroundTaskInvalid) {
 +                          [[UIApplication sharedApplication] endBackgroundTask:task];
 +                      }
 +                  }];
 +
-+    if (LegacyRTSBackgroundTask == UIBackgroundTaskInvalid) {
-+        LegacyRTSBackgroundTaskActive = NO;
++    if (TiberianDawnForiPadBackgroundTask == UIBackgroundTaskInvalid) {
++        TiberianDawnForiPadBackgroundTaskActive = NO;
 +    }
 +}
 +
-+void LegacyRTS_EndBackgroundTask(void)
++void TiberianDawnForiPad_EndBackgroundTask(void)
 +{
-+    if (!LegacyRTSBackgroundTaskActive) {
++    if (!TiberianDawnForiPadBackgroundTaskActive) {
 +        return;
 +    }
 +
-+    UIBackgroundTaskIdentifier task = LegacyRTSBackgroundTask;
-+    LegacyRTSBackgroundTaskActive = NO;
++    UIBackgroundTaskIdentifier task = TiberianDawnForiPadBackgroundTask;
++    TiberianDawnForiPadBackgroundTaskActive = NO;
 +    if (task != UIBackgroundTaskInvalid) {
 +        [[UIApplication sharedApplication] endBackgroundTask:task];
 +    }
@@ -188,7 +188,7 @@ index 31b114a..4ac4bef 100644
 +- (void)sceneWillResignActive:(UIScene *)scene
 +{
 +#if !TARGET_OS_TV
-+    LegacyRTS_BeginBackgroundTask();
++    TiberianDawnForiPad_BeginBackgroundTask();
 +#endif
 +    SDL_OnApplicationWillResignActive();
 +}
@@ -196,7 +196,7 @@ index 31b114a..4ac4bef 100644
 +- (void)sceneWillEnterForeground:(UIScene *)scene
 +{
 +#if !TARGET_OS_TV
-+    LegacyRTS_EndBackgroundTask();
++    TiberianDawnForiPad_EndBackgroundTask();
 +#endif
 +    SDL_OnApplicationWillEnterForeground();
 +}
@@ -234,7 +234,7 @@ index f7aa3fd..51af75a 100644
  #include "SDL_uikitmetalview.h"
  #include "SDL_uikitmessagebox.h"
  
-+/* Legacy RTS alteration: use UIWindowScene orientation for adaptive iPad windows. */
++/* Tiberian Dawn for iPad alteration: use UIWindowScene orientation for adaptive iPad windows. */
 +
  #define UIKITVID_DRIVER_NAME "uikit"
  
@@ -281,9 +281,9 @@ index 676fedb..cc800b4 100644
  
  /* The maximum number of mouse buttons we support */
  #define MAX_MOUSE_BUTTONS    5
-+#define LEGACY_RTS_PENCIL_HOVER       0x5048
-+#define LEGACY_RTS_PENCIL_DOUBLE_TAP  0x5044
-+#define LEGACY_RTS_PENCIL_SQUEEZE     0x5053
++#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_HOVER       0x5048
++#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_DOUBLE_TAP  0x5044
++#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE     0x5053
  
  /* This is defined in SDL_sysjoystick.m */
  #ifndef SDL_JOYSTICK_DISABLED
@@ -291,11 +291,11 @@ index 676fedb..cc800b4 100644
  
      SDL_TouchID directTouchId;
      SDL_TouchID indirectTouchId;
-+    BOOL legacyRTSTouchCancellation;
-+    CGPoint legacyRTSLastPencilHover;
++    BOOL tiberianDawnForiPadTouchCancellation;
++    CGPoint tiberianDawnForiPadLastPencilHover;
 +}
 +
-+- (void)legacyRTSPushPencilEvent:(Sint32)code location:(CGPoint)location
++- (void)tiberianDawnForiPadPushPencilEvent:(Sint32)code location:(CGPoint)location
 +{
 +    CGRect bounds = self.bounds;
 +    const double normalizedX = bounds.size.width > 0.0 ? (location.x - bounds.origin.x) / bounds.size.width : 0.0;
@@ -310,11 +310,11 @@ index 676fedb..cc800b4 100644
 +    SDL_PushEvent(&event);
 +}
 +
-+- (void)legacyRTSPencilHover:(UIHoverGestureRecognizer *)recognizer API_AVAILABLE(ios(13.0))
++- (void)tiberianDawnForiPadPencilHover:(UIHoverGestureRecognizer *)recognizer API_AVAILABLE(ios(13.0))
 +{
 +    if (recognizer.state == UIGestureRecognizerStateBegan || recognizer.state == UIGestureRecognizerStateChanged) {
-+        legacyRTSLastPencilHover = [recognizer locationInView:self];
-+        [self legacyRTSPushPencilEvent:LEGACY_RTS_PENCIL_HOVER location:legacyRTSLastPencilHover];
++        tiberianDawnForiPadLastPencilHover = [recognizer locationInView:self];
++        [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_HOVER location:tiberianDawnForiPadLastPencilHover];
 +    }
  }
  
@@ -326,7 +326,7 @@ index 676fedb..cc800b4 100644
 +#endif
 +#if !TARGET_OS_TV
 +        if (@available(iOS 13.0, *)) {
-+            UIHoverGestureRecognizer *pencilHover = [[UIHoverGestureRecognizer alloc] initWithTarget:self action:@selector(legacyRTSPencilHover:)];
++            UIHoverGestureRecognizer *pencilHover = [[UIHoverGestureRecognizer alloc] initWithTarget:self action:@selector(tiberianDawnForiPadPencilHover:)];
 +            pencilHover.allowedTouchTypes = @[@(UITouchTypePencil)];
 +            [self addGestureRecognizer:pencilHover];
 +        }
@@ -355,20 +355,20 @@ index 676fedb..cc800b4 100644
  
 +- (void)pencilInteractionDidTap:(UIPencilInteraction *)interaction
 +{
-+    [self legacyRTSPushPencilEvent:LEGACY_RTS_PENCIL_DOUBLE_TAP location:legacyRTSLastPencilHover];
++    [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_DOUBLE_TAP location:tiberianDawnForiPadLastPencilHover];
 +}
 +
 +- (void)pencilInteraction:(UIPencilInteraction *)interaction didReceiveTap:(UIPencilInteractionTap *)tap API_AVAILABLE(ios(17.5))
 +{
-+    CGPoint location = tap.hoverPose != nil ? tap.hoverPose.location : legacyRTSLastPencilHover;
-+    [self legacyRTSPushPencilEvent:LEGACY_RTS_PENCIL_DOUBLE_TAP location:location];
++    CGPoint location = tap.hoverPose != nil ? tap.hoverPose.location : tiberianDawnForiPadLastPencilHover;
++    [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_DOUBLE_TAP location:location];
 +}
 +
 +- (void)pencilInteraction:(UIPencilInteraction *)interaction didReceiveSqueeze:(UIPencilInteractionSqueeze *)squeeze API_AVAILABLE(ios(17.5))
 +{
 +    if (squeeze.phase == UIPencilInteractionPhaseEnded) {
-+        CGPoint location = squeeze.hoverPose != nil ? squeeze.hoverPose.location : legacyRTSLastPencilHover;
-+        [self legacyRTSPushPencilEvent:LEGACY_RTS_PENCIL_SQUEEZE location:location];
++        CGPoint location = squeeze.hoverPose != nil ? squeeze.hoverPose.location : tiberianDawnForiPadLastPencilHover;
++        [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE location:location];
 +    }
 +}
 +
@@ -380,7 +380,7 @@ index 676fedb..cc800b4 100644
              SDL_TouchDeviceType touchType = [self touchTypeForTouch:touch];
              SDL_TouchID touchId = [self touchIdForType:touchType];
 -            float pressure = [self pressureForTouch:touch];
-+            float pressure = legacyRTSTouchCancellation ? -1.0f : [self pressureForTouch:touch];
++            float pressure = tiberianDawnForiPadTouchCancellation ? -1.0f : [self pressureForTouch:touch];
  
              if (SDL_AddTouch(touchId, touchType, "") < 0) {
                  continue;
@@ -388,9 +388,9 @@ index 676fedb..cc800b4 100644
  
  - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
  {
-+    legacyRTSTouchCancellation = YES;
++    tiberianDawnForiPadTouchCancellation = YES;
      [self touchesEnded:touches withEvent:event];
-+    legacyRTSTouchCancellation = NO;
++    tiberianDawnForiPadTouchCancellation = NO;
  }
  
  - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
@@ -402,7 +402,7 @@ index dee4b19..4a51730 100644
      SDL_SendWindowEvent(window, SDL_WINDOWEVENT_RESIZED, w, h);
  }
  
-+/* Legacy RTS alteration: safe-area changes can occur without a size change
++/* Tiberian Dawn for iPad alteration: safe-area changes can occur without a size change
 + * when iPadOS shows or moves window controls. */
 +- (void)viewSafeAreaInsetsDidChange
 +{
@@ -422,7 +422,7 @@ index 0e0ea05..d4b2e55 100644
  
  #include <Foundation/Foundation.h>
  
-+/* Legacy RTS alteration: make SDL 2 windows scene-aware and expose safe-area geometry. */
++/* Tiberian Dawn for iPad alteration: make SDL 2 windows scene-aware and expose safe-area geometry. */
 +
  @implementation SDL_WindowData
  
@@ -488,7 +488,7 @@ index 0e0ea05..d4b2e55 100644
      return 1;
  }
  
-+void LegacyRTS_GetSafeAreaInsets(SDL_Window *window,
++void TiberianDawnForiPad_GetSafeAreaInsets(SDL_Window *window,
 +                                 int outputWidth,
 +                                 int outputHeight,
 +                                 int *left,
@@ -523,14 +523,14 @@ index 0e0ea05..d4b2e55 100644
 +    }
 +}
 +
-+int LegacyRTS_IsLowPowerModeEnabled(void)
++int TiberianDawnForiPad_IsLowPowerModeEnabled(void)
 +{
 +    @autoreleasepool {
 +        return [NSProcessInfo processInfo].lowPowerModeEnabled ? 1 : 0;
 +    }
 +}
 +
-+int LegacyRTS_GetThermalState(void)
++int TiberianDawnForiPad_GetThermalState(void)
 +{
 +    @autoreleasepool {
 +        if (@available(iOS 11.0, *)) {

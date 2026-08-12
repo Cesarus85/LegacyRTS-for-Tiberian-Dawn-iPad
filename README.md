@@ -1,15 +1,15 @@
-# Legacy RTS — for Command & Conquer: Tiberian Dawn on iPad
+# Tiberian Dawn for iPad
 
 > **EA has not endorsed and does not support this product.**
 
 **Command & Conquer: Tiberian Dawn (1995), running natively on iPadOS** through
-an unofficial, community-made engine port. Legacy RTS is based on
+an unofficial, community-made engine port. Tiberian Dawn for iPad is based on
 [Vanilla Conquer](https://github.com/TheAssemblyArmada/Vanilla-Conquer) and the
 source code released by Electronic Arts.
 
-> **Independent modified project.** Legacy RTS is not an Electronic Arts
-> product and is not affiliated with Electronic Arts. Command & Conquer and
-> related names are Electronic Arts trademarks. They are used in plain text
+> **Independent modified project.** Tiberian Dawn for iPad is not an Electronic
+> Arts product and is not affiliated with Electronic Arts. Command & Conquer
+> and related names are Electronic Arts trademarks. They are used in plain text
 > only to identify the game this port is for and the data it is compatible with.
 
 The repository contains **source code only**. It does not contain the game,
@@ -17,7 +17,7 @@ disc images, movies, music, graphics, or other original game data. You must
 supply data from C&C Gold GDI and Nod discs that you are legally entitled to
 use.
 
-[Project page](https://cesarus85.github.io/LegacyRTS-for-Tiberian-Dawn-iPad/) · [iPad build guide](README-iPadOS.md) ·
+[Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad/) · [iPad build guide](README-iPadOS.md) ·
 [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
 ## Highlights
@@ -28,12 +28,15 @@ use.
 - Guided on-device import of the GDI and Nod C&C Gold disc images
 - Files-visible manual saves plus transactional interruption recovery
 - 60 FPS presentation with a persistent 30 FPS battery mode
-- Metal-accelerated SDL rendering with full-size and pixel-perfect modes
+- Built-in resolution and presentation scaler with full-size sharp and integer
+  pixel-perfect modes, preserving the original 640 × 400 aspect ratio
+- Metal-accelerated SDL rendering
 - iPadOS audio-session handling for interruptions and route changes
-- No analytics, accounts, advertising, or network multiplayer
+- No analytics, accounts, or advertising
 
 The original campaigns, missions, videos, audio, and languages come from the
-user-supplied game data. Multiplayer is currently unavailable.
+user-supplied game data. Multiplayer is work in progress and planned for a
+later development stage; networking remains disabled in the current build.
 
 ## What this port involved
 
@@ -75,8 +78,8 @@ Requirements:
 Clone the project and its SDL dependency:
 
 ```sh
-git clone --recurse-submodules https://github.com/Cesarus85/LegacyRTS-for-Tiberian-Dawn-iPad.git
-cd LegacyRTS-for-Tiberian-Dawn-iPad
+git clone --recurse-submodules https://github.com/Cesarus85/Tiberian-Dawn-for-iPad.git
+cd Tiberian-Dawn-for-iPad
 ./scripts/prepare-ipados-dependencies.sh
 ```
 
@@ -92,10 +95,10 @@ then configure and build:
 ```sh
 cmake --preset ipados-device-local
 cmake --build --preset ipados-device-local
-open build/ipados-device/VanillaConquer.xcodeproj
+open build/ipados-device/TiberianDawnForiPad.xcodeproj
 ```
 
-In Xcode, select the `VanillaTD` scheme and your connected iPad. The detailed
+In Xcode, select the `TiberianDawn` scheme and your connected iPad. The detailed
 [iPadOS guide](README-iPadOS.md) covers installation, first launch, data import,
 controls, storage, and diagnostics.
 
@@ -121,7 +124,8 @@ has completed a launch and gameplay smoke test.
 
 ## Known limitations
 
-- Multiplayer and networking are disabled.
+- Multiplayer is work in progress for a later development stage; networking is
+  disabled in the current build.
 - Red Alert is present in the upstream source tree but is not an iPad target.
 - External-display behavior is not release-tested.
 - The macOS target compiles, but portable packaging and live gameplay still
@@ -138,8 +142,8 @@ has completed a launch and gameplay smoke test.
 - SDL contributors — platform, rendering, and input foundation
 - unshieldv3 contributors — InstallShield archive extraction used by the guided
   importer
-- Legacy RTS contributors — iPadOS integration, controls, importer, lifecycle,
-  storage, performance, and documentation
+- Tiberian Dawn for iPad contributors — iPadOS integration, controls, importer,
+  lifecycle, storage, performance, and documentation
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for license details.
 

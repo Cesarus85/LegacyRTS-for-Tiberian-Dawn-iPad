@@ -1,4 +1,4 @@
-# Legacy RTS iPadOS optimization roadmap
+# Tiberian Dawn for iPad — optimization roadmap
 
 This document records the iPad-specific audit and implementation work. The
 physical iPad build is now the sole development and acceptance target; the
@@ -19,9 +19,9 @@ Implemented in the canonical physical-iPad target:
   VoiceOver hints, visible progress, retry help, completion confirmation and an
   explicit set-up-later path are included.
 - Immutable assets live in
-  `Library/Application Support/LegacyRTS/vanillatd` and are excluded from
+  `Library/Application Support/TiberianDawnForiPad/vanillatd` and are excluded from
   backup. Settings, manual saves, and recovery saves remain in the
-  Files-visible `Documents/LegacyRTS/vanillatd` directory.
+  Files-visible `Documents/TiberianDawnForiPad/vanillatd` directory.
 - `AVAudioSession` uses the system-silent-switch policy and observes audio
   interruptions, route/Bluetooth changes, and media-service resets.
 - Visual Controls offers full-size sharp or integer pixel-perfect rendering,
@@ -41,7 +41,7 @@ single-player iPad port.
 
 ## Current status
 
-- VanillaTD builds, signs, installs, and launches on the physical iPad.
+- TiberianDawn builds, signs, installs, and launches on the physical iPad.
 - SDL uses the accelerated Metal renderer with VSync.
 - The complete GDI and Nod C&C Gold data set is recognized.
 - The main menu renders and one-finger selection works.
@@ -54,8 +54,8 @@ single-player iPad port.
   recovery autosaves when the app enters the background.
 - A valid interrupted mission is offered through a Continue prompt on the next
   launch.
-- Game assets are stored below `Library/Application Support/LegacyRTS/vanillatd`;
-  settings and saves remain below `Documents/LegacyRTS/vanillatd`.
+- Game assets are stored below `Library/Application Support/TiberianDawnForiPad/vanillatd`;
+  settings and saves remain below `Documents/TiberianDawnForiPad/vanillatd`.
 - Touch input distinguishes tap, thresholded selection drag, long press,
   two-finger pan, two-finger secondary click, and cancellation.
 - Native text input opens the iPad keyboard for edit fields and respects the
@@ -326,10 +326,11 @@ Planned work:
 
 ### Multiplayer
 
-The iPad preset currently builds with networking disabled while the legacy menu
-can still expose multiplayer options. Decide between:
+Multiplayer is work in progress and planned for a later development stage. The
+iPad preset currently builds with networking disabled while the existing menu
+can still expose multiplayer options. Later work includes:
 
-- hiding unavailable network choices; or
+- hiding unavailable network choices until the implementation is ready; and
 - restoring and modernizing LAN/Internet play, including local-network privacy
   declarations, discovery, background behavior, and compatibility testing.
 

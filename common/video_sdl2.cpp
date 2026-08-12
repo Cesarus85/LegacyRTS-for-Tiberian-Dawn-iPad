@@ -71,15 +71,15 @@ static int window_points_w;
 static int window_points_h;
 
 #ifdef IPADOS_PORT
-extern "C" void LegacyRTS_GetSafeAreaInsets(SDL_Window* sdl_window,
+extern "C" void TiberianDawnForiPad_GetSafeAreaInsets(SDL_Window* sdl_window,
                                               int output_width,
                                               int output_height,
                                               int* left,
                                               int* top,
                                               int* right,
                                               int* bottom);
-extern "C" int LegacyRTS_IsLowPowerModeEnabled(void);
-extern "C" int LegacyRTS_GetThermalState(void);
+extern "C" int TiberianDawnForiPad_IsLowPowerModeEnabled(void);
+extern "C" int TiberianDawnForiPad_GetThermalState(void);
 #endif
 
 #ifdef IPADOS_PORT
@@ -140,8 +140,8 @@ void Update_Power_State()
     }
 
     power_state_checked_at = now;
-    const bool new_low_power_mode = LegacyRTS_IsLowPowerModeEnabled() != 0;
-    const int new_thermal_state = LegacyRTS_GetThermalState();
+    const bool new_low_power_mode = TiberianDawnForiPad_IsLowPowerModeEnabled() != 0;
+    const int new_thermal_state = TiberianDawnForiPad_GetThermalState();
     if (new_low_power_mode != low_power_mode || new_thermal_state != thermal_state) {
         low_power_mode = new_low_power_mode;
         thermal_state = new_thermal_state;
@@ -308,7 +308,7 @@ static void Update_HWCursor_Settings()
     int safe_right = 0;
     int safe_bottom = 0;
 #ifdef IPADOS_PORT
-    LegacyRTS_GetSafeAreaInsets(window,
+    TiberianDawnForiPad_GetSafeAreaInsets(window,
                                 renderer_output_w,
                                 renderer_output_h,
                                 &safe_left,
@@ -345,7 +345,7 @@ static void Update_HWCursor_Settings()
     }
     render_dst.x = safe_left + (available_w - render_dst.w) / 2;
     render_dst.y = safe_top + (available_h - render_dst.h) / 2;
-    LegacyRTS_SetCompactWindowWarning(window_points_w < 640 || window_points_h < 400);
+    TiberianDawnForiPad_SetCompactWindowWarning(window_points_w < 640 || window_points_h < 400);
 #else
     if (Settings.Video.Boxing) {
         size_t colonPos = Settings.Video.BoxingAspectRatio.find(":");

@@ -22,7 +22,7 @@ limitations under the License.
 
 class ISArchiveV3 {
 public:
-    // Legacy RTS adaptation: std::string keeps the extractor compatible with
+    // Tiberian Dawn for iPad adaptation: std::string keeps the extractor compatible with
     // the engine's C++11 build without changing the archive format logic.
     ISArchiveV3(const std::string& apath);
 

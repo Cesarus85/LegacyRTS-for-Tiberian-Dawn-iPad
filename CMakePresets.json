@@ -97,7 +97,7 @@
                 "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
                 "CMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH": "YES",
-                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/LegacyRTS-iPad-Simulator-Products",
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnForiPad-iPad-Simulator-Products",
                 "BUILD_VANILLATD": "ON",
                 "BUILD_VANILLARA": "OFF",
                 "BUILD_REMASTERTD": "OFF",
@@ -118,8 +118,8 @@
             "binaryDir": "${sourceDir}/build/ipados-device",
             "cacheVariables": {
                 "CMAKE_OSX_SYSROOT": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk",
-                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/LegacyRTS-iPad-Device-Products",
-                "IPADOS_BUNDLE_IDENTIFIER": "org.openlegacyrts.ipad"
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnForiPad-iPad-Device-Products",
+                "IPADOS_BUNDLE_IDENTIFIER": "org.tiberiandawn.ipad"
             }
         }
     ],
@@ -162,23 +162,23 @@
         {
             "name": "ipados-simulator",
             "configurePreset": "ipados-simulator",
-            "displayName": "Legacy RTS for iPad Simulator",
+            "displayName": "Tiberian Dawn for iPad — Simulator",
             "configuration": "Debug",
-            "targets": ["VanillaTD"]
+            "targets": ["TiberianDawn"]
         },
         {
             "name": "ipados-device",
             "configurePreset": "ipados-device",
-            "displayName": "Legacy RTS for iPad Device",
+            "displayName": "Tiberian Dawn for iPad — Device",
             "configuration": "Debug",
-            "targets": ["VanillaTD"]
+            "targets": ["TiberianDawn"]
         },
         {
             "name": "ipados-device-release",
             "configurePreset": "ipados-device",
-            "displayName": "Legacy RTS for iPad Release",
+            "displayName": "Tiberian Dawn for iPad — Release",
             "configuration": "Release",
-            "targets": ["VanillaTD"]
+            "targets": ["TiberianDawn"]
         }
     ],
     "testPresets": [

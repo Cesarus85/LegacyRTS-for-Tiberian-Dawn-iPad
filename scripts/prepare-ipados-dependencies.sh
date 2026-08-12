@@ -11,7 +11,7 @@ if [ ! -f "$sdl_directory/CMakeLists.txt" ]; then
 fi
 
 if git -C "$sdl_directory" apply --reverse --check "$patch_file" >/dev/null 2>&1; then
-    echo "Legacy RTS SDL2 iPadOS patch is already applied."
+    echo "Tiberian Dawn for iPad SDL2 iPadOS patch is already applied."
     exit 0
 fi
 
@@ -21,4 +21,4 @@ if ! git -C "$sdl_directory" apply --check "$patch_file"; then
 fi
 
 git -C "$sdl_directory" apply "$patch_file"
-echo "Applied the Legacy RTS SDL2 iPadOS patch."
+echo "Applied the Tiberian Dawn for iPad SDL2 iPadOS patch."

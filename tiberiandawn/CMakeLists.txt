@@ -211,27 +211,27 @@ if(BUILD_VANILLATD)
         # Generate windows version info.
         generate_product_version(
             VANILLATD_RC
-            NAME "VanillaTD"
-            BUNDLE "Vanilla Conquer"
+            NAME "Tiberian Dawn for iPad"
+            BUNDLE "Tiberian Dawn for iPad"
             VERSION_MAJOR 1
             VERSION_MINOR 0
-            COMPANY_NAME "Vanilla Conquer"
+            COMPANY_NAME "Tiberian Dawn for iPad contributors"
             COMPANY_COPYRIGHT "Based on code released under GPLv3 by EA"
-            ORIGINAL_FILENAME "vanillatd.exe"
-            RCFILE_PREFIX "VanillaTD"
+            ORIGINAL_FILENAME "tiberiandawn.exe"
+            RCFILE_PREFIX "TiberianDawn"
             ICON "${VANILLATD_ICON}"
         )
     endif()
 
     # A target must include the icon for the custom command to run.
-    add_executable(VanillaTD ${TIBDAWN_SRC} ${TIBDAWN_NET_SRC} ${TIBDAWN_HEADERS} ${VANILLATD_RC} ${VANILLATD_ICON})
+    add_executable(TiberianDawn ${TIBDAWN_SRC} ${TIBDAWN_NET_SRC} ${TIBDAWN_HEADERS} ${VANILLATD_RC} ${VANILLATD_ICON})
 
     if(MAKE_BUNDLE)
         set_source_files_properties(${VANILLATD_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-        set_target_properties(VanillaTD PROPERTIES
+        set_target_properties(TiberianDawn PROPERTIES
             MACOSX_BUNDLE True
-            MACOSX_BUNDLE_GUI_IDENTIFIER com.vanilla-conquer.vanillatd
-            MACOSX_BUNDLE_BUNDLE_NAME VanillaTD
+            MACOSX_BUNDLE_GUI_IDENTIFIER org.tiberiandawn.macos
+            MACOSX_BUNDLE_BUNDLE_NAME "Tiberian Dawn"
             MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
             MACOSX_BUNDLE_COPYRIGHT "Based on code released under GPLv3 by EA"
@@ -247,13 +247,13 @@ if(BUILD_VANILLATD)
                 ${CMAKE_SOURCE_DIR}/platform/apple/PrivacyInfo.xcprivacy
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources
             )
-            target_sources(VanillaTD PRIVATE
+            target_sources(TiberianDawn PRIVATE
                 ${CMAKE_SOURCE_DIR}/resources/ipados/Assets.xcassets
                 ${CMAKE_SOURCE_DIR}/platform/apple/PrivacyInfo.xcprivacy
             )
-            set_target_properties(VanillaTD PROPERTIES
+            set_target_properties(TiberianDawn PROPERTIES
                 MACOSX_BUNDLE_GUI_IDENTIFIER "${IPADOS_BUNDLE_IDENTIFIER}"
-                MACOSX_BUNDLE_BUNDLE_NAME "Legacy RTS"
+                MACOSX_BUNDLE_BUNDLE_NAME "Tiberian Dawn for iPad"
                 MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/platform/apple/Info-iPadOS.plist.in"
                 XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${IPADOS_BUNDLE_IDENTIFIER}"
                 XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2"
@@ -262,9 +262,9 @@ if(BUILD_VANILLATD)
                 XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES"
                 XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
             )
-            target_link_libraries(VanillaTD "-framework UIKit" "-framework AVFAudio" "-framework UniformTypeIdentifiers")
+            target_link_libraries(TiberianDawn "-framework UIKit" "-framework AVFAudio" "-framework UniformTypeIdentifiers")
             if(IPADOS_DEVELOPMENT_TEAM)
-                set_target_properties(VanillaTD PROPERTIES
+                set_target_properties(TiberianDawn PROPERTIES
                     XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${IPADOS_DEVELOPMENT_TEAM}"
                     XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
                 )
@@ -272,30 +272,30 @@ if(BUILD_VANILLATD)
         endif()
     endif()
 
-    target_compile_definitions(VanillaTD PUBLIC $<$<CONFIG:Debug>:_DEBUG> ${VANILLA_DEFS} MEGAMAPS)
-    target_include_directories(VanillaTD PUBLIC ${CMAKE_SOURCE_DIR} .)
-    target_link_libraries(VanillaTD commonv ${VANILLA_LIBS} ${STATIC_LIBS})
-    set_target_properties(VanillaTD PROPERTIES OUTPUT_NAME vanillatd)
+    target_compile_definitions(TiberianDawn PUBLIC $<$<CONFIG:Debug>:_DEBUG> ${VANILLA_DEFS} MEGAMAPS)
+    target_include_directories(TiberianDawn PUBLIC ${CMAKE_SOURCE_DIR} .)
+    target_link_libraries(TiberianDawn commonv ${VANILLA_LIBS} ${STATIC_LIBS})
+    set_target_properties(TiberianDawn PROPERTIES OUTPUT_NAME TiberianDawn)
     if(MAP_EDITORTD)
-        target_compile_definitions(VanillaTD PUBLIC INTERNAL_VERSION)
+        target_compile_definitions(TiberianDawn PUBLIC INTERNAL_VERSION)
     endif()
     # Control if we auto generate a console and which "main" function we link using MSVC.
     if(MSVC)
-        target_link_options(VanillaTD PRIVATE /subsystem:windows /ENTRY:mainCRTStartup)
+        target_link_options(TiberianDawn PRIVATE /subsystem:windows /ENTRY:mainCRTStartup)
     endif()
     if(WIN32 AND NOT MSVC)
-        set_target_properties(VanillaTD PROPERTIES LINK_FLAGS "-mwindows")
+        set_target_properties(TiberianDawn PROPERTIES LINK_FLAGS "-mwindows")
     endif()
     if(BUILD_WITH_UBSAN)
-        target_compile_options(VanillaTD PUBLIC
+        target_compile_options(TiberianDawn PUBLIC
                     -fsanitize=undefined,float-divide-by-zero,integer,implicit-conversion,implicit-integer-truncation,implicit-integer-arithmetic-value-change,local-bounds,nullability
                     -g3 -fno-omit-frame-pointer)
-        target_link_options(VanillaTD PUBLIC -fsanitize=undefined,float-divide-by-zero,integer,implicit-conversion,implicit-integer-truncation,implicit-integer-arithmetic-value-change,local-bounds,nullability)
+        target_link_options(TiberianDawn PUBLIC -fsanitize=undefined,float-divide-by-zero,integer,implicit-conversion,implicit-integer-truncation,implicit-integer-arithmetic-value-change,local-bounds,nullability)
     endif()
     if(BUILD_WITH_ASAN)
-        target_compile_options(VanillaTD PUBLIC
+        target_compile_options(TiberianDawn PUBLIC
                     -fsanitize=address
                     -g3 -fno-omit-frame-pointer)
-        target_link_options(VanillaTD PUBLIC -fsanitize=address)
+        target_link_options(TiberianDawn PUBLIC -fsanitize=address)
     endif()
 endif()

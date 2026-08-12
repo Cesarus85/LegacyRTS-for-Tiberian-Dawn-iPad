@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for helping improve Legacy RTS.
+Thank you for helping improve Tiberian Dawn for iPad.
 
 ## Before submitting a change
 

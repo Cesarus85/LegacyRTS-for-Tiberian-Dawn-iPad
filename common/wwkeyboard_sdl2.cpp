@@ -26,7 +26,7 @@
 
 void Focus_Loss();
 void Focus_Restore();
-extern "C" void LegacyRTS_ConfigureAudioSession(void);
+extern "C" void TiberianDawnForiPad_ConfigureAudioSession(void);
 void Process_Network();
 
 #ifdef IPADOS_PORT
@@ -514,7 +514,7 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
                 Focus_Loss();
             } else if (event.user.code == IPADOS_EVENT_AUDIO_RESUME
                        || event.user.code == IPADOS_EVENT_AUDIO_ROUTE_CHANGED) {
-                LegacyRTS_ConfigureAudioSession();
+                TiberianDawnForiPad_ConfigureAudioSession();
                 Focus_Restore();
             }
             break;
