@@ -32,6 +32,7 @@ jobs:
 
   ipados-compile:
     runs-on: macos-15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,6 +40,10 @@ jobs:
       - name: Apply project SDL patch
         run: ./scripts/prepare-ipados-dependencies.sh
       - name: Configure unsigned iPad target
-        run: cmake --preset ipados-device
+        run: >-
+          cmake --preset ipados-device
+          -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
       - name: Compile unsigned iPad target
         run: cmake --build --preset ipados-device -- -quiet CODE_SIGNING_ALLOWED=NO
