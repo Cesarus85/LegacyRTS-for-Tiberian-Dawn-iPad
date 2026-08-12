@@ -117,22 +117,16 @@
       <div class="section-heading">
         <p class="eyebrow" data-de="QUELLCODE STATT FERTIGPAKET" data-en="SOURCE INSTEAD OF A GAME PACKAGE">QUELLCODE STATT FERTIGPAKET</p>
         <h2 data-de="Auf dein iPad bauen" data-en="Build it for your iPad">Auf dein iPad bauen</h2>
-        <p data-de="Xcode signiert die App mit deinem eigenen Apple-Entwicklerteam. Persönliche Werte bleiben in einer ignorierten lokalen Preset-Datei." data-en="Xcode signs the app with your own Apple development team. Personal values stay in an ignored local preset file.">Xcode signiert die App mit deinem eigenen Apple-Entwicklerteam. Persönliche Werte bleiben in einer ignorierten lokalen Preset-Datei.</p>
+        <p data-de="Der sichere Ein-Klick-Starter prüft die Werkzeuge und öffnet das aktuelle Projekt. In Xcode wählst du nur dein eigenes Apple-Entwicklerteam, dein iPad und Start." data-en="The safe one-click starter verifies the tools and opens the current project. In Xcode, just choose your own Apple development team, your iPad, and Run.">Der sichere Ein-Klick-Starter prüft die Werkzeuge und öffnet das aktuelle Projekt. In Xcode wählst du nur dein eigenes Apple-Entwicklerteam, dein iPad und Start.</p>
       </div>
       <div class="terminal" role="region" aria-label="Build commands">
         <div class="terminal-bar"><i></i><i></i><i></i><span>Terminal</span></div>
-        <pre><code><span class="comment"># Clone source and dependency</span>
-git clone --recurse-submodules https://github.com/Cesarus85/Tiberian-Dawn-for-iPad.git
+        <pre><code><span class="comment"># Clone the source</span>
+git clone https://github.com/Cesarus85/Tiberian-Dawn-for-iPad.git
 cd Tiberian-Dawn-for-iPad
-./scripts/prepare-ipados-dependencies.sh
 
-<span class="comment"># Create private signing settings</span>
-cp resources/CMakeUserPresets.json.example CMakeUserPresets.json
-
-<span class="comment"># Configure and build</span>
-cmake --preset ipados-device-local
-cmake --build --preset ipados-device-local
-open build/ipados-device/TiberianDawnForiPad.xcodeproj</code></pre>
+<span class="comment"># Verify, prepare and open the Xcode project</span>
+open "Open Tiberian Dawn for iPad.command"</code></pre>
       </div>
       <a class="text-link" href="../README-iPadOS.md" data-repo-path="README-iPadOS.md" data-de="Vollständige iPadOS-Anleitung lesen →" data-en="Read the complete iPadOS guide →">Vollständige iPadOS-Anleitung lesen →</a>
     </section>

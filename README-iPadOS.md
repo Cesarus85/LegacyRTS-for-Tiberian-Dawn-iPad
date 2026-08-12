@@ -13,11 +13,35 @@ entitled to use.
 - Apple Silicon Mac
 - Xcode with its license accepted and iOS platform components installed
 - CMake 3.25 or newer
-- Ninja (used for the fast macOS baseline build)
+- An Apple ID added to Xcode for personal-device signing
 
-Do not create an empty project in Xcode. CMake owns the project structure.
+Do not create an empty project in Xcode.
 
-## Canonical physical-iPad project
+## Recommended safe setup
+
+Download the repository source archive or clone it, then double-click this file
+in the project folder:
+
+```text
+Open Tiberian Dawn for iPad.command
+```
+
+If macOS shows its normal first-open confirmation for the downloaded command
+file, Control-click it, choose Open, and confirm once.
+
+The starter checks the local tools, retrieves the exact SDL2 revision recorded
+by the project if necessary, verifies and applies the checked-in iPad patch,
+generates `TiberianDawnForiPad.xcodeproj`, and opens it. It never uses `sudo`,
+installs packages, changes Apple credentials, or reads game data.
+
+In Xcode, select the `TiberianDawn` scheme. Open the target's Signing &
+Capabilities tab, choose your Apple Development Team, and use a unique Bundle
+Identifier if Xcode requests one. Select the connected iPad and press Run.
+
+The remaining commands in this document are for contributors and repeat-build
+automation. Normal users do not need to create a CMake signing preset.
+
+## Contributor workflow for the canonical physical-iPad project
 
 The physical iPad build is the canonical development and acceptance target.
 All new work must be built and verified with `ipados-device` on real hardware.
@@ -45,8 +69,8 @@ Then open:
 build/ipados-device/TiberianDawnForiPad.xcodeproj
 ```
 
-Select the `TiberianDawn` scheme and `iPad von Stefan`. Signing is managed
-automatically with the development team stored in the CMake cache.
+Select the `TiberianDawn` scheme and the connected iPad. Signing is managed
+automatically with the development team stored in the private CMake cache.
 
 The generated Xcode project deliberately places simulator and device app
 products under `/private/tmp/TiberianDawnForiPad-iPad-*-Products`. This prevents iCloud

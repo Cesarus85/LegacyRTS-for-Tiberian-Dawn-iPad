@@ -20,6 +20,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check public source tree
         run: ./scripts/check-release-tree.sh
+      - name: Check safe Xcode starter
+        run: |
+          sh -n "Open Tiberian Dawn for iPad.command"
+          script_commit=$(sed -n 's/^sdl_commit="\([0-9a-f]*\)"/\1/p' "Open Tiberian Dawn for iPad.command")
+          test "$script_commit" = "$(git rev-parse HEAD:third_party/SDL2)"
 
   host-tests:
     runs-on: macos-15
