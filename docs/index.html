@@ -8,9 +8,11 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="Legacy RTS — for Command &amp; Conquer: Tiberian Dawn on iPad">
   <meta property="og:description" content="An unofficial native iPadOS port for Command &amp; Conquer: Tiberian Dawn (1995). Source code only; original game data required.">
-  <meta property="og:image" content="assets/og.png">
+  <meta property="og:url" content="https://cesarus85.github.io/LegacyRTS-for-Tiberian-Dawn-iPad/">
+  <meta property="og:image" content="https://cesarus85.github.io/LegacyRTS-for-Tiberian-Dawn-iPad/assets/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <title>Legacy RTS — for Command &amp; Conquer: Tiberian Dawn on iPad</title>
+  <link rel="canonical" href="https://cesarus85.github.io/LegacyRTS-for-Tiberian-Dawn-iPad/">
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/site.js" defer></script>
 </head>
@@ -120,8 +122,8 @@
       <div class="terminal" role="region" aria-label="Build commands">
         <div class="terminal-bar"><i></i><i></i><i></i><span>Terminal</span></div>
         <pre><code><span class="comment"># Clone source and dependency</span>
-git clone --recurse-submodules YOUR_REPOSITORY_URL
-cd legacy-rts-ipad
+git clone --recurse-submodules https://github.com/Cesarus85/LegacyRTS-for-Tiberian-Dawn-iPad.git
+cd LegacyRTS-for-Tiberian-Dawn-iPad
 ./scripts/prepare-ipados-dependencies.sh
 
 <span class="comment"># Create private signing settings</span>

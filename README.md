@@ -17,7 +17,7 @@ disc images, movies, music, graphics, or other original game data. You must
 supply data from C&C Gold GDI and Nod discs that you are legally entitled to
 use.
 
-[Project page](docs/index.html) · [iPad build guide](README-iPadOS.md) ·
+[Project page](https://cesarus85.github.io/LegacyRTS-for-Tiberian-Dawn-iPad/) · [iPad build guide](README-iPadOS.md) ·
 [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
 ## Highlights
@@ -75,8 +75,8 @@ Requirements:
 Clone the project and its SDL dependency:
 
 ```sh
-git clone --recurse-submodules YOUR_REPOSITORY_URL
-cd legacy-rts-ipad
+git clone --recurse-submodules https://github.com/Cesarus85/LegacyRTS-for-Tiberian-Dawn-iPad.git
+cd LegacyRTS-for-Tiberian-Dawn-iPad
 ./scripts/prepare-ipados-dependencies.sh
 ```
 

@@ -34,7 +34,7 @@ After the empty repository exists:
 
 ```sh
 git remote rename origin upstream
-git remote add origin YOUR_REPOSITORY_URL
+git remote add origin https://github.com/Cesarus85/LegacyRTS-for-Tiberian-Dawn-iPad.git
 git branch -M main
 ```
 
