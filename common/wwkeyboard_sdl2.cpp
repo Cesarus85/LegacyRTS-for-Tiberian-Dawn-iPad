@@ -26,8 +26,21 @@
 
 void Focus_Loss();
 void Focus_Restore();
-extern "C" void TiberianDawnForiPad_ConfigureAudioSession(void);
+extern "C" void TiberianDawn_ConfigureAudioSession(void);
+extern "C" bool TiberianDawn_RebuildAudioEngine(void);
 void Process_Network();
+
+namespace
+{
+bool Is_Text_Producing_Scancode(SDL_Scancode scancode)
+{
+    return (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_0)
+           || (scancode >= SDL_SCANCODE_MINUS && scancode <= SDL_SCANCODE_SLASH)
+           || (scancode >= SDL_SCANCODE_KP_DIVIDE && scancode <= SDL_SCANCODE_KP_PERIOD)
+           || scancode == SDL_SCANCODE_SPACE || scancode == SDL_SCANCODE_NONUSBACKSLASH
+           || scancode == SDL_SCANCODE_KP_EQUALS;
+}
+}
 
 #ifdef IPADOS_PORT
 namespace
@@ -359,15 +372,6 @@ void Discard_IPadOS_Touch_Pan(void)
     PendingPanAt = 0;
 }
 
-bool Is_Text_Producing_Scancode(SDL_Scancode scancode)
-{
-    return (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_0)
-           || (scancode >= SDL_SCANCODE_MINUS && scancode <= SDL_SCANCODE_SLASH)
-           || (scancode >= SDL_SCANCODE_KP_DIVIDE && scancode <= SDL_SCANCODE_KP_PERIOD)
-           || scancode == SDL_SCANCODE_SPACE || scancode == SDL_SCANCODE_NONUSBACKSLASH
-           || scancode == SDL_SCANCODE_KP_EQUALS;
-}
-
 uint32_t Decode_UTF8_Character(const char*& text)
 {
     const unsigned char first = static_cast<unsigned char>(*text++);
@@ -470,21 +474,14 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
             exit(0);
             break;
         case SDL_KEYDOWN:
-#ifdef IPADOS_PORT
             if (!SDL_IsTextInputActive() || !Is_Text_Producing_Scancode(event.key.keysym.scancode)) {
                 Put_Key_Message(event.key.keysym.scancode, false);
             }
-#else
-            Put_Key_Message(event.key.keysym.scancode, false);
-#endif
             break;
         case SDL_KEYUP:
-#ifdef IPADOS_PORT
             if (SDL_IsTextInputActive() && Is_Text_Producing_Scancode(event.key.keysym.scancode)) {
                 break;
-            }
-#endif
-            if (event.key.keysym.scancode == SDL_SCANCODE_RETURN && Down(VK_MENU)) {
+            } else if (event.key.keysym.scancode == SDL_SCANCODE_RETURN && Down(VK_MENU)) {
                 Toggle_Video_Fullscreen();
             } else {
                 Put_Key_Message(event.key.keysym.scancode, true);
@@ -512,9 +509,13 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
                 Put_Key_Message(SDL_SCANCODE_ESCAPE, true);
             } else if (event.user.code == IPADOS_EVENT_AUDIO_PAUSE) {
                 Focus_Loss();
+            } else if (event.user.code == IPADOS_EVENT_AUDIO_RESET) {
+                TiberianDawn_ConfigureAudioSession();
+                TiberianDawn_RebuildAudioEngine();
+                Focus_Restore();
             } else if (event.user.code == IPADOS_EVENT_AUDIO_RESUME
                        || event.user.code == IPADOS_EVENT_AUDIO_ROUTE_CHANGED) {
-                TiberianDawnForiPad_ConfigureAudioSession();
+                TiberianDawn_ConfigureAudioSession();
                 Focus_Restore();
             }
             break;
@@ -522,18 +523,22 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
             Queue_Text_Input(*this, event.text.text);
             break;
 #endif
-        case SDL_MOUSEMOTION:
+        case SDL_MOUSEMOTION: {
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #ifdef IPADOS_PORT
             Video_Record_Input_Timestamp(event.motion.timestamp);
             if (!Is_Gamepad_Active()) {
+#endif
                 int x = 0;
                 int y = 0;
                 Set_Video_Mouse_Window(event.motion.x, event.motion.y, x, y);
+#ifdef IPADOS_PORT
             }
+#endif
 #else
             Move_Video_Mouse(static_cast<float>(event.motion.xrel), static_cast<float>(event.motion.yrel));
 #endif
-            break;
+        } break;
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP: {
             int x, y;
@@ -551,8 +556,10 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
                 break;
             }
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #ifdef IPADOS_PORT
             Video_Record_Input_Timestamp(event.button.timestamp);
+#endif
             Set_Video_Mouse_Window(event.button.x, event.button.y, x, y);
 #else
             if (Settings.Mouse.RawInput || Is_Gamepad_Active()) {
@@ -668,14 +675,17 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
         Reset_Touch_Gesture();
         Focus_Loss();
         Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_TERMINATING);
-    } else if (lifecycle_events & APP_LIFECYCLE_ENTERED_BACKGROUND) {
-        Cancel_Touch_Gesture(*this);
-        Reset_Touch_Gesture();
-        Focus_Loss();
-        Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_BACKGROUND);
-    } else if (lifecycle_events & APP_LIFECYCLE_ENTERED_FOREGROUND) {
-        Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_FOREGROUND);
-        Focus_Restore();
+    } else {
+        if (lifecycle_events & APP_LIFECYCLE_ENTERED_BACKGROUND) {
+            Cancel_Touch_Gesture(*this);
+            Reset_Touch_Gesture();
+            Focus_Loss();
+            Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_BACKGROUND);
+        }
+        if (lifecycle_events & APP_LIFECYCLE_ENTERED_FOREGROUND) {
+            Dispatch_App_Lifecycle_Event(APP_LIFECYCLE_ENTERED_FOREGROUND);
+            Focus_Restore();
+        }
     }
 #endif
 }

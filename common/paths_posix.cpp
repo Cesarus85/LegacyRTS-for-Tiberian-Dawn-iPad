@@ -187,7 +187,9 @@ const char* PathsClass::Data_Path()
 #if defined(__APPLE__) && TARGET_OS_IPHONE
         // Immutable CD assets belong in Application Support. Documents stays
         // small, writable and useful for settings/save-game exchange in Files.
-        DataPath = User_Home() + "/Library/Application Support/TiberianDawnForiPad";
+        DataPath = User_Home() + "/Library/Application Support/TiberianDawn";
+#elif defined(MACOS_PORT)
+        DataPath = User_Home() + "/Library/Application Support/Tiberian Dawn/Game Data";
 #else
         DataPath = ProgramPath.substr(0, ProgramPath.find_last_of("/")) + SEP + "share";
 #endif
@@ -206,7 +208,9 @@ const char* PathsClass::User_Path()
 #if defined(__APPLE__) && TARGET_OS_IPHONE
         // Documents is writable and visible through Files. Only settings,
         // save games and recovery autosaves live here.
-        UserPath = User_Home() + "/Documents/TiberianDawnForiPad";
+        UserPath = User_Home() + "/Documents/TiberianDawn";
+#elif defined(MACOS_PORT)
+        UserPath = User_Home() + "/Library/Application Support/Tiberian Dawn/User Data";
 #elif defined(__APPLE__)
         UserPath = User_Home() + "/Library/Application Support/Vanilla-Conquer";
 #else

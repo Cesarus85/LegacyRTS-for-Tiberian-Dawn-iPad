@@ -50,6 +50,7 @@ private:
         BUTTON_RESET,
         BUTTON_OPTIONS,      // Button number for "Options menu"
         BUTTON_IPAD_PRESENTATION,
+        BUTTON_IPAD_ARTWORK,
         BUTTON_IPAD_UI_SCALE,
         BUTTON_IPAD_ACCESSIBILITY,
         OPTION_WIDTH = 216,  // Width of dialog box.

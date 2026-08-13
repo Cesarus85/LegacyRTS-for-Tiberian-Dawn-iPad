@@ -9,6 +9,7 @@ enum IPadOSInputEventCode
     IPADOS_EVENT_AUDIO_PAUSE = 0x4150,
     IPADOS_EVENT_AUDIO_RESUME = 0x4152,
     IPADOS_EVENT_AUDIO_ROUTE_CHANGED = 0x4143,
+    IPADOS_EVENT_AUDIO_RESET = 0x4158,
 };
 
 // Returns a short-lived, normalized two-finger pan delta. Positive values mean

@@ -639,7 +639,65 @@ void InfantryClass::Draw_It(int x, int y, WindowNumberType window)
     /*
     **	Actually draw the root body of the unit.
     */
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    int hd_pose = -1;
+    const int hd_stage = Fetch_Stage();
+    switch (doit) {
+    case DO_STAND_READY:
+    case DO_STAND_GUARD:
+    case DO_IDLE1:
+    case DO_IDLE2:
+    case DO_ON_GUARD:
+    case DO_FIGHT_READY:
+    case DO_READY_WEAPON:
+    case DO_GESTURE1:
+    case DO_SALUTE1:
+    case DO_GESTURE2:
+    case DO_SALUTE2:
+        hd_pose = 0;
+        break;
+    case DO_WALK: {
+        static const int walk_pose[4] = {1, 2, 3, 2};
+        hd_pose = walk_pose[hd_stage % 4];
+        break;
+    }
+    case DO_FIRE_WEAPON:
+        hd_pose = 4;
+        break;
+    case DO_PRONE:
+    case DO_FIRE_PRONE:
+        hd_pose = 5;
+        break;
+    case DO_CRAWL: {
+        static const int crawl_pose[4] = {6, 7, 8, 7};
+        hd_pose = crawl_pose[hd_stage % 4];
+        break;
+    }
+    case DO_LIE_DOWN:
+    case DO_GET_UP:
+        hd_pose = 9;
+        break;
+    default:
+        break;
+    }
+    const bool use_hd_minigunner = *this == INFANTRY_E1 && window == WINDOW_TACTICAL
+                                   && Visual_Character() == VISUAL_NORMAL && hd_pose >= 0
+                                   && Video_Uses_HD_Minigunner_Artwork();
+    if (use_hd_minigunner) {
+        const int origin_x = WindowList[window][WINDOWX] + LogicPage->Get_XPos();
+        const int origin_y = WindowList[window][WINDOWY] + LogicPage->Get_YPos();
+        Video_Set_HD_Infantry(this,
+                              hd_pose * 8 + facenum,
+                              origin_x + x,
+                              origin_y + y,
+                              House ? House->Class->BrightColor : WHITE);
+    } else {
+        Video_Remove_HD_Artwork(this);
+        Techno_Draw_Object(shapefile, shapenum, x, y, window);
+    }
+#else
     Techno_Draw_Object(shapefile, shapenum, x, y, window);
+#endif
     //	CC_Draw_Shape(shapefile, shapenum, x, y, window, SHAPE_FADING|SHAPE_CENTER|SHAPE_WIN_REL|SHAPE_GHOST,
     //House->Remap_Table(IsBlushing, true), Map.UnitShadow);
 

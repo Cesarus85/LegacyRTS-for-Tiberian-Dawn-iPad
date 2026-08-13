@@ -44,6 +44,13 @@
 #ifdef IPADOS_PORT
 #include "ipados_lifecycle.h"
 #endif
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#ifdef IPADOS_PORT
+#include "platform/apple/ipados_platform.h"
+#else
+#include "platform/apple/macos_platform.h"
+#endif
+#endif
 #include "loaddlg.h"
 #include "common/gitinfo.h"
 #include "common/vqaconfig.h"
@@ -288,11 +295,23 @@ bool Init_Game(int, char*[])
     **	Fetch the language text from the hard drive first. If it cannot be
     **	found on the hard drive, then look for it in the mixfile.
     */
-    if (RawFileClass(Language_Name("CONQUER")).Is_Available()) {
-        SystemStrings = (char const*)Load_Alloc_Data(CCFileClass(Language_Name("CONQUER")));
+    const char* requested_language_file = Language_Name("CONQUER");
+    if (RawFileClass(requested_language_file).Is_Available()) {
+        SystemStrings = (char const*)Load_Alloc_Data(CCFileClass(requested_language_file));
     } else {
-        SystemStrings = (char const*)MFCD::Retrieve(Language_Name("CONQUER"));
+        SystemStrings = (char const*)MFCD::Retrieve(requested_language_file);
     }
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    // A localized Gold release can provide CONQUER.GER. English remains the
+    // safe fallback for English discs and other system languages.
+    if (!SystemStrings && strcmp(requested_language_file, "CONQUER.ENG") != 0) {
+        if (RawFileClass("CONQUER.ENG").Is_Available()) {
+            SystemStrings = (char const*)Load_Alloc_Data(CCFileClass("CONQUER.ENG"));
+        } else {
+            SystemStrings = (char const*)MFCD::Retrieve("CONQUER.ENG");
+        }
+    }
+#endif
 
     /*
     **	Default palette initialization. Uses the desert palette for convenience,
@@ -867,7 +886,9 @@ bool Select_Game(bool fade)
             if (!recovery_prompted) {
                 recovery_prompted = true;
                 if (IPadOS_Has_Recovery_Autosave()) {
-                    if (WWMessageBox().Process("Interrupted mission found. Continue?", "Continue", "Main Menu") == 0) {
+                    if (WWMessageBox().Process(TiberianDawn_LocalizedText("recovery_prompt"),
+                                               TiberianDawn_LocalizedText("continue"),
+                                               TiberianDawn_LocalizedText("main_menu")) == 0) {
                         if (IPadOS_Load_Recovery_Autosave()) {
                             Theme.Queue_Song(THEME_AOI);
                             process = false;

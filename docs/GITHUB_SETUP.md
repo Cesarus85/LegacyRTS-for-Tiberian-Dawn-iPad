@@ -2,15 +2,15 @@
 
 Suggested public repository metadata:
 
-- **Repository name:** `Tiberian-Dawn-for-iPad`
-- **Display title:** `Tiberian Dawn for iPad`
-- **Description:** `Unofficial native iPadOS port for Command & Conquer: Tiberian Dawn (1995), with touch controls and adaptive resolution scaling. Multiplayer: work in progress. No game assets included.`
+- **Repository name:** `Tiberian-Dawn-for-iPad-and-macOS`
+- **Display title:** `Tiberian Dawn for iPad and macOS`
+- **Description:** `Unofficial native iPadOS and macOS port for Command & Conquer: Tiberian Dawn (1995), with touch controls and adaptive resolution scaling. Multiplayer: work in progress. No game assets included.`
 - **Website:** use the GitHub Pages URL after the first Pages deployment
 - **Topics:** `tiberian-dawn`, `command-and-conquer`, `ipad`, `ipados`, `ios`,
-  `rts`, `game-port`, `open-source-game`, `sdl2`, `metal`, `cmake`,
+  `macos`, `universal-binary`, `rts`, `game-port`, `open-source-game`, `sdl2`, `metal`, `cmake`,
   `vanilla-conquer`
 
-`Tiberian Dawn for iPad` remains the independent project name. The searchable wording
+`Tiberian Dawn for iPad and macOS` remains the independent project name. The searchable wording
 explicitly says that it is a port **for** the original game. The original title
 appears in plain text in the repository metadata and README, not as the
 project's logo or an assertion of affiliation. This follows EA's published
@@ -34,7 +34,7 @@ After the empty repository exists:
 
 ```sh
 git remote rename origin upstream
-git remote add origin https://github.com/Cesarus85/Tiberian-Dawn-for-iPad.git
+git remote add origin https://github.com/Cesarus85/Tiberian-Dawn-for-iPad-and-macOS.git
 git branch -M main
 ```
 

@@ -45,39 +45,39 @@ index 31b114a..4ac4bef 100644
 +#if !TARGET_OS_TV
 +/* Tiberian Dawn for iPad alteration: keep a short iPadOS background task alive while the
 + * engine serializes an autosave in its normal event-pump context. */
-+static UIBackgroundTaskIdentifier TiberianDawnForiPadBackgroundTask;
-+static BOOL TiberianDawnForiPadBackgroundTaskActive = NO;
++static UIBackgroundTaskIdentifier TiberianDawnBackgroundTask;
++static BOOL TiberianDawnBackgroundTaskActive = NO;
 +
-+void TiberianDawnForiPad_BeginBackgroundTask(void)
++void TiberianDawn_BeginBackgroundTask(void)
 +{
-+    if (TiberianDawnForiPadBackgroundTaskActive) {
++    if (TiberianDawnBackgroundTaskActive) {
 +        return;
 +    }
 +
-+    TiberianDawnForiPadBackgroundTaskActive = YES;
-+    TiberianDawnForiPadBackgroundTask = [[UIApplication sharedApplication]
-+        beginBackgroundTaskWithName:@"TiberianDawnForiPadAutosave"
++    TiberianDawnBackgroundTaskActive = YES;
++    TiberianDawnBackgroundTask = [[UIApplication sharedApplication]
++        beginBackgroundTaskWithName:@"TiberianDawnAutosave"
 +                  expirationHandler:^{
-+                      UIBackgroundTaskIdentifier task = TiberianDawnForiPadBackgroundTask;
-+                      TiberianDawnForiPadBackgroundTaskActive = NO;
++                      UIBackgroundTaskIdentifier task = TiberianDawnBackgroundTask;
++                      TiberianDawnBackgroundTaskActive = NO;
 +                      if (task != UIBackgroundTaskInvalid) {
 +                          [[UIApplication sharedApplication] endBackgroundTask:task];
 +                      }
 +                  }];
 +
-+    if (TiberianDawnForiPadBackgroundTask == UIBackgroundTaskInvalid) {
-+        TiberianDawnForiPadBackgroundTaskActive = NO;
++    if (TiberianDawnBackgroundTask == UIBackgroundTaskInvalid) {
++        TiberianDawnBackgroundTaskActive = NO;
 +    }
 +}
 +
-+void TiberianDawnForiPad_EndBackgroundTask(void)
++void TiberianDawn_EndBackgroundTask(void)
 +{
-+    if (!TiberianDawnForiPadBackgroundTaskActive) {
++    if (!TiberianDawnBackgroundTaskActive) {
 +        return;
 +    }
 +
-+    UIBackgroundTaskIdentifier task = TiberianDawnForiPadBackgroundTask;
-+    TiberianDawnForiPadBackgroundTaskActive = NO;
++    UIBackgroundTaskIdentifier task = TiberianDawnBackgroundTask;
++    TiberianDawnBackgroundTaskActive = NO;
 +    if (task != UIBackgroundTaskInvalid) {
 +        [[UIApplication sharedApplication] endBackgroundTask:task];
 +    }
@@ -188,7 +188,7 @@ index 31b114a..4ac4bef 100644
 +- (void)sceneWillResignActive:(UIScene *)scene
 +{
 +#if !TARGET_OS_TV
-+    TiberianDawnForiPad_BeginBackgroundTask();
++    TiberianDawn_BeginBackgroundTask();
 +#endif
 +    SDL_OnApplicationWillResignActive();
 +}
@@ -196,7 +196,7 @@ index 31b114a..4ac4bef 100644
 +- (void)sceneWillEnterForeground:(UIScene *)scene
 +{
 +#if !TARGET_OS_TV
-+    TiberianDawnForiPad_EndBackgroundTask();
++    TiberianDawn_EndBackgroundTask();
 +#endif
 +    SDL_OnApplicationWillEnterForeground();
 +}
@@ -488,7 +488,7 @@ index 0e0ea05..d4b2e55 100644
      return 1;
  }
  
-+void TiberianDawnForiPad_GetSafeAreaInsets(SDL_Window *window,
++void TiberianDawn_GetSafeAreaInsets(SDL_Window *window,
 +                                 int outputWidth,
 +                                 int outputHeight,
 +                                 int *left,
@@ -523,14 +523,14 @@ index 0e0ea05..d4b2e55 100644
 +    }
 +}
 +
-+int TiberianDawnForiPad_IsLowPowerModeEnabled(void)
++int TiberianDawn_IsLowPowerModeEnabled(void)
 +{
 +    @autoreleasepool {
 +        return [NSProcessInfo processInfo].lowPowerModeEnabled ? 1 : 0;
 +    }
 +}
 +
-+int TiberianDawnForiPad_GetThermalState(void)
++int TiberianDawn_GetThermalState(void)
 +{
 +    @autoreleasepool {
 +        if (@available(iOS 11.0, *)) {

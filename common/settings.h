@@ -32,6 +32,7 @@ public:
         int FrameLimit;
         bool BatterySaving;
         int PresentationMode;
+        int ArtworkMode;
         int TouchUIScale;
         bool LargeCursor;
         bool HighContrast;

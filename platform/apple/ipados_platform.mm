@@ -3,7 +3,12 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "ipados_platform.h"
+#include "../../common/ipados_audio_engine.h"
+#include "common/install_transaction.h"
+#include "common/iso9660.h"
+#include "common/ipados_localization.h"
 #include "common/ipados_touch.h"
+#include "common/savegame_transfer.h"
 #include "third_party/SDL2/include/SDL.h"
 #include "third_party/unshieldv3/ISArchiveV3.h"
 
@@ -12,81 +17,42 @@
 #include <cstring>
 #include <fstream>
 #include <functional>
-#include <map>
-#include <set>
+#include <fcntl.h>
 #include <stdexcept>
 #include <string>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <vector>
+
+extern "C" bool TiberianDawn_ValidateSaveGame(const char* path,
+                                             char* description,
+                                             size_t description_capacity,
+                                             unsigned* scenario,
+                                             int* faction);
 
 namespace
 {
-NSString* const ProductDirectory = @"TiberianDawnForiPad";
+NSString* const ProductDirectory = @"TiberianDawn";
 NSString* const GameDirectory = @"vanillatd";
+NSString* const LanguagePreferenceKey = @"TiberianDawn.LanguagePreference";
 
-NSString* PreviousProductDirectory()
+int StoredLanguagePreference()
 {
-    // Keep upgrades compatible without retaining the retired product name as
-    // a searchable identifier in the source tree.
-    return [@"Legacy" stringByAppendingString:@"RTS"];
+    const NSInteger value = [[NSUserDefaults standardUserDefaults] integerForKey:LanguagePreferenceKey];
+    return value >= IPAD_LANGUAGE_SYSTEM && value <= IPAD_LANGUAGE_ENGLISH
+        ? static_cast<int>(value)
+        : IPAD_LANGUAGE_SYSTEM;
 }
 
-NSURL* ProductRootURL(NSSearchPathDirectory baseDirectory, NSString* productDirectory)
+IPadLanguage EffectiveLanguage()
 {
-    NSURL* base = [[[NSFileManager defaultManager] URLsForDirectory:baseDirectory
-                                                          inDomains:NSUserDomainMask] firstObject];
-    return [base URLByAppendingPathComponent:productDirectory isDirectory:YES];
+    NSString* tag = NSLocale.preferredLanguages.firstObject ?: @"en";
+    return Resolve_IPad_Language(StoredLanguagePreference(), tag.UTF8String);
 }
 
-void MergePreviousDirectory(NSURL* previous, NSURL* current)
+NSString* L(const char* key)
 {
-    NSFileManager* manager = [NSFileManager defaultManager];
-    BOOL previousIsDirectory = NO;
-    if (![manager fileExistsAtPath:previous.path isDirectory:&previousIsDirectory] || !previousIsDirectory) {
-        return;
-    }
-
-    BOOL currentIsDirectory = NO;
-    if (![manager fileExistsAtPath:current.path isDirectory:&currentIsDirectory]) {
-        NSError* moveError = nil;
-        if ([manager moveItemAtURL:previous toURL:current error:&moveError]) {
-            return;
-        }
-        NSLog(@"Tiberian Dawn for iPad: previous data directory could not be moved: %@", moveError);
-    }
-
-    [manager createDirectoryAtURL:current withIntermediateDirectories:YES attributes:nil error:nil];
-    NSArray<NSURL*>* items = [manager contentsOfDirectoryAtURL:previous
-                                    includingPropertiesForKeys:@[NSURLIsDirectoryKey]
-                                                       options:NSDirectoryEnumerationSkipsHiddenFiles
-                                                         error:nil];
-    for (NSURL* item in items) {
-        NSURL* destination = [current URLByAppendingPathComponent:item.lastPathComponent];
-        NSNumber* sourceIsDirectory = nil;
-        NSNumber* destinationIsDirectory = nil;
-        [item getResourceValue:&sourceIsDirectory forKey:NSURLIsDirectoryKey error:nil];
-        [destination getResourceValue:&destinationIsDirectory forKey:NSURLIsDirectoryKey error:nil];
-        if (sourceIsDirectory.boolValue && destinationIsDirectory.boolValue) {
-            MergePreviousDirectory(item, destination);
-        } else if (![manager fileExistsAtPath:destination.path]) {
-            [manager moveItemAtURL:item toURL:destination error:nil];
-        }
-    }
-    [manager removeItemAtURL:previous error:nil];
-}
-
-void MigratePreviousProductDirectories()
-{
-    NSString* previousProductDirectory = PreviousProductDirectory();
-    MergePreviousDirectory(ProductRootURL(NSApplicationSupportDirectory, previousProductDirectory),
-                           ProductRootURL(NSApplicationSupportDirectory, ProductDirectory));
-    MergePreviousDirectory(ProductRootURL(NSDocumentDirectory, previousProductDirectory),
-                           ProductRootURL(NSDocumentDirectory, ProductDirectory));
-}
-
-uint32_t ReadLE32(const unsigned char* value)
-{
-    return static_cast<uint32_t>(value[0]) | (static_cast<uint32_t>(value[1]) << 8)
-           | (static_cast<uint32_t>(value[2]) << 16) | (static_cast<uint32_t>(value[3]) << 24);
+    return [NSString stringWithUTF8String:IPad_Localized_Text(EffectiveLanguage(), key)];
 }
 
 std::string Upper(std::string value)
@@ -97,126 +63,21 @@ std::string Upper(std::string value)
     return value;
 }
 
-class ISO9660
-{
-public:
-    struct Entry
-    {
-        uint32_t extent;
-        uint32_t size;
-        bool directory;
-    };
-
-    explicit ISO9660(const std::string& path) : stream(path.c_str(), std::ios::binary)
-    {
-        if (!stream) {
-            throw std::runtime_error("ISO konnte nicht geoeffnet werden");
-        }
-        std::vector<unsigned char> pvd(2048);
-        stream.seekg(16 * 2048, std::ios::beg);
-        stream.read(reinterpret_cast<char*>(pvd.data()), pvd.size());
-        if (stream.gcount() != static_cast<std::streamsize>(pvd.size()) || pvd[0] != 1
-            || std::memcmp(pvd.data() + 1, "CD001", 5) != 0) {
-            throw std::runtime_error("Keine ISO-9660-CD");
-        }
-        volume.assign(reinterpret_cast<char*>(pvd.data() + 40), 32);
-        while (!volume.empty() && volume.back() == ' ') {
-            volume.pop_back();
-        }
-        const unsigned char* root = pvd.data() + 156;
-        ReadDirectory(ReadLE32(root + 2), ReadLE32(root + 10), "", 0);
-    }
-
-    const std::string& Volume() const { return volume; }
-
-    bool Has(const std::string& path) const { return entries.find(Upper(path)) != entries.end(); }
-
-    void Extract(const std::string& source, const std::string& destination)
-    {
-        std::map<std::string, Entry>::const_iterator it = entries.find(Upper(source));
-        if (it == entries.end() || it->second.directory) {
-            throw std::runtime_error("CD-Datei fehlt: " + source);
-        }
-        std::ifstream input(filePath.c_str(), std::ios::binary);
-        input.seekg(static_cast<std::streamoff>(it->second.extent) * 2048, std::ios::beg);
-        std::ofstream output(destination.c_str(), std::ios::binary | std::ios::trunc);
-        std::vector<char> buffer(1024 * 1024);
-        uint32_t remaining = it->second.size;
-        while (remaining > 0) {
-            const std::streamsize count = std::min<uint32_t>(remaining, buffer.size());
-            input.read(buffer.data(), count);
-            if (input.gcount() != count) {
-                throw std::runtime_error("CD-Lesefehler");
-            }
-            output.write(buffer.data(), count);
-            remaining -= static_cast<uint32_t>(count);
-        }
-        if (!output) {
-            throw std::runtime_error("Zieldatei konnte nicht geschrieben werden");
-        }
-    }
-
-    void SetPath(const std::string& path) { filePath = path; }
-
-private:
-    void ReadDirectory(uint32_t extent, uint32_t size, const std::string& prefix, int depth)
-    {
-        if (depth > 4 || size == 0 || size > 32 * 1024 * 1024) {
-            return;
-        }
-        std::vector<unsigned char> data(size);
-        stream.seekg(static_cast<std::streamoff>(extent) * 2048, std::ios::beg);
-        stream.read(reinterpret_cast<char*>(data.data()), size);
-        size_t offset = 0;
-        while (offset < data.size()) {
-            const unsigned char recordLength = data[offset];
-            if (recordLength == 0) {
-                offset = ((offset / 2048) + 1) * 2048;
-                continue;
-            }
-            if (offset + recordLength > data.size() || recordLength < 34) {
-                break;
-            }
-            const unsigned char* record = data.data() + offset;
-            const unsigned char nameLength = record[32];
-            if (33 + nameLength <= recordLength && !(nameLength == 1 && (record[33] == 0 || record[33] == 1))) {
-                std::string name(reinterpret_cast<const char*>(record + 33), nameLength);
-                const size_t version = name.find(';');
-                if (version != std::string::npos) {
-                    name.erase(version);
-                }
-                const std::string path = prefix.empty() ? name : prefix + "/" + name;
-                Entry entry = {ReadLE32(record + 2), ReadLE32(record + 10), (record[25] & 2) != 0};
-                entries[Upper(path)] = entry;
-                if (entry.directory && (depth == 0 || Upper(path) == "INSTALL")) {
-                    ReadDirectory(entry.extent, entry.size, path, depth + 1);
-                }
-            }
-            offset += recordLength;
-        }
-    }
-
-    std::ifstream stream;
-    std::string filePath;
-    std::string volume;
-    std::map<std::string, Entry> entries;
-};
-
 NSURL* LibraryDataURL()
 {
-    return [ProductRootURL(NSApplicationSupportDirectory, ProductDirectory)
+    NSURL* applicationSupport = [[[NSFileManager defaultManager]
+        URLsForDirectory:NSApplicationSupportDirectory
+               inDomains:NSUserDomainMask] firstObject];
+    return [[applicationSupport URLByAppendingPathComponent:ProductDirectory isDirectory:YES]
         URLByAppendingPathComponent:GameDirectory isDirectory:YES];
 }
 
-NSURL* DocumentsDataURL()
+NSURL* LegacyDataURL()
 {
-    return [[ProductRootURL(NSDocumentDirectory, ProductDirectory)
+    NSURL* documents = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                               inDomains:NSUserDomainMask] firstObject];
+    return [[[documents URLByAppendingPathComponent:ProductDirectory isDirectory:YES]
         URLByAppendingPathComponent:GameDirectory isDirectory:YES] URLByStandardizingPath];
-}
-
-bool Exists(NSURL* directory, NSString* relative)
-{
-    return [[NSFileManager defaultManager] fileExistsAtPath:[[directory URLByAppendingPathComponent:relative] path]];
 }
 
 bool ValidData(NSURL* directory)
@@ -229,7 +90,10 @@ bool ValidData(NSURL* directory)
         @"nod/GENERAL.MIX", @"nod/MOVIES.MIX", @"nod/SCORES.MIX"
     ];
     for (NSString* file in required) {
-        if (!Exists(directory, file)) {
+        NSURL* url = [directory URLByAppendingPathComponent:file];
+        NSDictionary* attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:url.path error:nil];
+        if (!attributes || ![attributes[NSFileType] isEqualToString:NSFileTypeRegular]
+            || [attributes[NSFileSize] unsignedLongLongValue] == 0) {
             return false;
         }
     }
@@ -244,31 +108,50 @@ void ExcludeFromBackup(NSURL* directory)
 void AtomicInstall(NSURL* staging, NSURL* destination)
 {
     NSFileManager* manager = [NSFileManager defaultManager];
-    [manager createDirectoryAtURL:[destination URLByDeletingLastPathComponent]
-      withIntermediateDirectories:YES attributes:nil error:nil];
+    NSError* directoryError = nil;
+    if (![manager createDirectoryAtURL:[destination URLByDeletingLastPathComponent]
+            withIntermediateDirectories:YES attributes:nil error:&directoryError]) {
+        throw std::runtime_error([[directoryError localizedDescription] UTF8String]);
+    }
     NSURL* old = [[destination URLByDeletingLastPathComponent] URLByAppendingPathComponent:@"vanillatd.old" isDirectory:YES];
-    [manager removeItemAtURL:old error:nil];
-    if ([manager fileExistsAtPath:destination.path]) {
-        if (![manager moveItemAtURL:destination toURL:old error:nil]) {
-            throw std::runtime_error("Vorhandene Daten konnten nicht gesichert werden");
+    InstallOperations operations;
+    operations.exists = [manager](const std::string& path) {
+        return [manager fileExistsAtPath:@(path.c_str())];
+    };
+    operations.remove = [manager](const std::string& path) {
+        NSString* value = @(path.c_str());
+        return ![manager fileExistsAtPath:value] || [manager removeItemAtPath:value error:nil];
+    };
+    operations.move = [manager](const std::string& source, const std::string& target) {
+        return [manager moveItemAtPath:@(source.c_str()) toPath:@(target.c_str()) error:nil];
+    };
+    const InstallCommitResult result = Commit_Staged_Install(staging.fileSystemRepresentation,
+                                                              destination.fileSystemRepresentation,
+                                                              old.fileSystemRepresentation,
+                                                              operations);
+    if (!result.committed) {
+        if (result.error == INSTALL_COMMIT_ROLLBACK_FAILED) {
+            throw std::runtime_error(L("error_atomic_rollback").UTF8String);
         }
+        throw std::runtime_error(L("error_atomic_install").UTF8String);
     }
-    NSError* error = nil;
-    if (![manager moveItemAtURL:staging toURL:destination error:&error]) {
-        [manager moveItemAtURL:old toURL:destination error:nil];
-        throw std::runtime_error([[error localizedDescription] UTF8String]);
-    }
-    [manager removeItemAtURL:old error:nil];
     ExcludeFromBackup(destination);
 }
 
 void EnsureImportCapacity(NSURL* directory)
 {
-    NSDictionary* attributes = [[NSFileManager defaultManager] attributesOfFileSystemForPath:directory.path error:nil];
+    NSError* error = nil;
+    NSDictionary* attributes = [[NSFileManager defaultManager] attributesOfFileSystemForPath:directory.path error:&error];
     const unsigned long long available = [attributes[NSFileSystemFreeSize] unsignedLongLongValue];
     const unsigned long long required = 1200ULL * 1024ULL * 1024ULL;
-    if (available > 0 && available < required) {
-        throw std::runtime_error("Fuer den sicheren Import werden mindestens 1,2 GB freier Speicher benoetigt");
+    const ImportCapacityDecision decision = Evaluate_Import_Capacity(attributes != nil && error == nil,
+                                                                      available,
+                                                                      required);
+    if (decision == IMPORT_CAPACITY_UNKNOWN) {
+        throw std::runtime_error(L("error_storage_unknown").UTF8String);
+    }
+    if (decision == IMPORT_CAPACITY_INSUFFICIENT) {
+        throw std::runtime_error(L("error_storage_low").UTF8String);
     }
 }
 
@@ -324,7 +207,7 @@ void WriteBytes(const std::vector<uint8_t>& bytes, const std::string& path)
         output.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
     }
     if (!output) {
-        throw std::runtime_error("Installationsdatei konnte nicht geschrieben werden");
+        throw std::runtime_error(L("error_write_install").UTF8String);
     }
 }
 
@@ -357,12 +240,11 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
         const bool accessed = [url startAccessingSecurityScopedResource];
         try {
             ISO9660 iso(url.fileSystemRepresentation);
-            iso.SetPath(url.fileSystemRepresentation);
             const std::string volume = Upper(iso.Volume());
             NSString* side = volume.find("GDI") != std::string::npos ? @"gdi" :
                              (volume.find("NOD") != std::string::npos ? @"nod" : nil);
             if (side == nil) {
-                throw std::runtime_error("Eine CD ist weder GDI95 noch NOD95");
+                throw std::runtime_error(L("error_disc_identity").UTF8String);
             }
             haveGDI = haveGDI || [side isEqualToString:@"gdi"];
             haveNod = haveNod || [side isEqualToString:@"nod"];
@@ -376,9 +258,14 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
                 iso.Extract(name, [[[staging URLByAppendingPathComponent:side] URLByAppendingPathComponent:@(name)] path].UTF8String);
             }
             if (!setupDone && iso.Has("INSTALL/SETUP.Z")) {
-                NSURL* setup = [[staging URLByDeletingLastPathComponent] URLByAppendingPathComponent:@"SETUP.Z"];
-                iso.Extract("INSTALL/SETUP.Z", setup.fileSystemRepresentation);
-                ExtractSetupFiles(setup.fileSystemRepresentation, staging);
+                NSURL* setup = [staging URLByAppendingPathComponent:@".SETUP.Z.importing"];
+                @try {
+                    iso.Extract("INSTALL/SETUP.Z", setup.fileSystemRepresentation);
+                    ExtractSetupFiles(setup.fileSystemRepresentation, staging);
+                } @catch (NSException* exception) {
+                    [manager removeItemAtURL:setup error:nil];
+                    throw std::runtime_error([[exception reason] UTF8String]);
+                }
                 [manager removeItemAtURL:setup error:nil];
                 setupDone = true;
             }
@@ -389,18 +276,18 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
         if (accessed) [url stopAccessingSecurityScopedResource];
     }
     if (!haveGDI || !haveNod) {
-        throw std::runtime_error("Bitte die GDI- und die Nod-CD gemeinsam auswaehlen");
+        throw std::runtime_error(L("error_both_discs").UTF8String);
     }
 }
 
 } // namespace
 
-@interface TiberianDawnForiPadImportGuideController : UIViewController <UIDocumentPickerDelegate>
+@interface TiberianDawnImportGuideController : UIViewController <UIDocumentPickerDelegate>
 @property(nonatomic, strong) NSArray<NSURL*>* URLs;
 @property(nonatomic) BOOL finished;
 @end
 
-@implementation TiberianDawnForiPadImportGuideController
+@implementation TiberianDawnImportGuideController
 
 - (UILabel*)guideLabel:(NSString*)text font:(UIFont*)font color:(UIColor*)color
 {
@@ -425,7 +312,7 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
     UIScrollView* scroll = [UIScrollView new];
     scroll.translatesAutoresizingMaskIntoConstraints = NO;
     scroll.alwaysBounceVertical = YES;
-    scroll.accessibilityLabel = @"Anleitung zum Import der Original-Spieldaten";
+    scroll.accessibilityLabel = L("import_guide_accessibility");
     [self.view addSubview:scroll];
 
     UIStackView* content = [UIStackView new];
@@ -442,7 +329,7 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
     symbol.isAccessibilityElement = NO;
     [content addArrangedSubview:symbol];
 
-    UILabel* title = [self guideLabel:@"Original-Spieldaten importieren"
+    UILabel* title = [self guideLabel:L("import_title")
                                  font:[UIFont preferredFontForTextStyle:UIFontTextStyleLargeTitle]
                                 color:UIColor.whiteColor];
     title.font = [UIFont systemFontOfSize:34 weight:UIFontWeightBold];
@@ -451,7 +338,7 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
     [content addArrangedSubview:title];
 
     UILabel* introduction = [self guideLabel:
-        @"Tiberian Dawn for iPad enthält aus rechtlichen Gründen keine Originaldaten. Für das Spiel brauchst du deine eigenen Command & Conquer Gold-CDs. Es werden keine Dateien hochgeladen."
+        L("import_intro")
                                               font:[UIFont preferredFontForTextStyle:UIFontTextStyleBody]
                                              color:secondary];
     introduction.textAlignment = NSTextAlignmentCenter;
@@ -472,29 +359,29 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
         [requirements.topAnchor constraintEqualToAnchor:requirementsCard.layoutMarginsGuide.topAnchor],
         [requirements.bottomAnchor constraintEqualToAnchor:requirementsCard.layoutMarginsGuide.bottomAnchor]
     ]];
-    UILabel* needTitle = [self guideLabel:@"Du benötigst"
+    UILabel* needTitle = [self guideLabel:L("import_need_title")
                                      font:[UIFont preferredFontForTextStyle:UIFontTextStyleHeadline]
                                     color:UIColor.whiteColor];
     needTitle.accessibilityTraits = UIAccessibilityTraitHeader;
     [requirements addArrangedSubview:needTitle];
     [requirements addArrangedSubview:[self guideLabel:
-        @"• CNC95_GDI.iso – die originale GDI Gold-CD\n• CNC95_Nod.iso – die originale Nod Gold-CD\n• mindestens 1,2 GB freien Speicher"
+        L("import_requirements")
                                                   font:[UIFont preferredFontForTextStyle:UIFontTextStyleBody]
                                                  color:secondary]];
     [content addArrangedSubview:requirementsCard];
 
-    UILabel* stepsTitle = [self guideLabel:@"So funktioniert es"
+    UILabel* stepsTitle = [self guideLabel:L("import_steps_title")
                                       font:[UIFont preferredFontForTextStyle:UIFontTextStyleHeadline]
                                      color:UIColor.whiteColor];
     stepsTitle.accessibilityTraits = UIAccessibilityTraitHeader;
     [content addArrangedSubview:stepsTitle];
     [content addArrangedSubview:[self guideLabel:
-        @"1. Lege beide ISO-Dateien in Dateien, iCloud Drive oder auf einem angeschlossenen USB-Laufwerk ab.\n\n2. Tippe unten auf „Spieldaten auswählen“.\n\n3. Markiere GDI und Nod gemeinsam und bestätige mit „Öffnen“.\n\n4. Lass die App geöffnet, während sie die CDs prüft und installiert."
+        L("import_steps")
                                                 font:[UIFont preferredFontForTextStyle:UIFontTextStyleBody]
                                                color:secondary]];
 
     UILabel* alternative = [self guideLabel:
-        @"Alternativ kannst du genau einen bereits vorbereiteten vanillatd-Ordner auswählen. Ultimate Collection, The First Decade und Remastered Collection werden nicht unterstützt."
+        L("import_alternative")
                                              font:[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote]
                                             color:[UIColor colorWithWhite:0.66 alpha:1.0]];
     [content addArrangedSubview:alternative];
@@ -510,23 +397,23 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
 
     UIButton* selectButton = [UIButton buttonWithType:UIButtonTypeSystem];
     selectButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [selectButton setTitle:@"Spieldaten auswählen" forState:UIControlStateNormal];
+    [selectButton setTitle:L("select_game_data") forState:UIControlStateNormal];
     [selectButton setTitleColor:[UIColor colorWithRed:0.04 green:0.05 blue:0.04 alpha:1.0] forState:UIControlStateNormal];
     selectButton.titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
     selectButton.titleLabel.adjustsFontForContentSizeCategory = YES;
     selectButton.backgroundColor = primary;
     selectButton.layer.cornerRadius = 12;
-    selectButton.accessibilityHint = @"Öffnet Dateien. Wähle dort die GDI- und die Nod-ISO gemeinsam aus.";
+    selectButton.accessibilityHint = L("select_game_data_hint");
     [selectButton.heightAnchor constraintGreaterThanOrEqualToConstant:52].active = YES;
     [selectButton addTarget:self action:@selector(selectSources:) forControlEvents:UIControlEventTouchUpInside];
     [actions addArrangedSubview:selectButton];
 
     UIButton* laterButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [laterButton setTitle:@"Später einrichten" forState:UIControlStateNormal];
+    [laterButton setTitle:L("setup_later") forState:UIControlStateNormal];
     [laterButton setTitleColor:secondary forState:UIControlStateNormal];
     laterButton.titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
     [laterButton.heightAnchor constraintGreaterThanOrEqualToConstant:44].active = YES;
-    laterButton.accessibilityHint = @"Schließt die App. Beim nächsten Start erscheint diese Anleitung erneut.";
+    laterButton.accessibilityHint = L("setup_later_hint");
     [laterButton addTarget:self action:@selector(importLater:) forControlEvents:UIControlEventTouchUpInside];
     [actions addArrangedSubview:laterButton];
 
@@ -549,11 +436,18 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
 
 - (void)selectSources:(id)sender
 {
+    // iPadOS currently maps the .iso extension to a dynamic UTI rather than
+    // public.disk-image. Include that exact extension-derived type so ISO-9660
+    // images remain selectable without widening the picker to arbitrary data.
+    UTType* isoType = [UTType typeWithFilenameExtension:@"iso" conformingToType:UTTypeData];
+    NSArray<UTType*>* contentTypes = isoType
+        ? @[ isoType, UTTypeDiskImage, UTTypeFolder ]
+        : @[ UTTypeDiskImage, UTTypeFolder ];
     UIDocumentPickerViewController* picker = [[UIDocumentPickerViewController alloc]
-        initForOpeningContentTypes:@[UTTypeDiskImage, UTTypeFolder] asCopy:NO];
+        initForOpeningContentTypes:contentTypes asCopy:NO];
     picker.allowsMultipleSelection = YES;
     picker.delegate = self;
-    picker.title = @"GDI und Nod gemeinsam auswählen";
+    picker.title = L("picker_both_discs");
     [self presentViewController:picker animated:YES completion:nil];
 }
 
@@ -575,6 +469,410 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
 }
 @end
 
+static bool SyncSavePath(const std::string& path, bool directory)
+{
+    int flags = O_RDONLY;
+#ifdef O_DIRECTORY
+    if (directory) flags |= O_DIRECTORY;
+#else
+    (void)directory;
+#endif
+    const int descriptor = open(path.c_str(), flags);
+    if (descriptor < 0) return false;
+    const bool result = fsync(descriptor) == 0;
+    close(descriptor);
+    return result;
+}
+
+static NSArray<NSDictionary*>* LoadManualSaveRecords(void)
+{
+    NSFileManager* manager = [NSFileManager defaultManager];
+    NSURL* directory = LegacyDataURL();
+    [manager createDirectoryAtURL:directory withIntermediateDirectories:YES attributes:nil error:nil];
+    NSArray<NSURL*>* files = [manager contentsOfDirectoryAtURL:directory
+                                    includingPropertiesForKeys:@[NSURLIsRegularFileKey, NSURLContentModificationDateKey]
+                                                       options:NSDirectoryEnumerationSkipsHiddenFiles
+                                                         error:nil];
+    NSMutableArray<NSDictionary*>* records = [NSMutableArray array];
+    for (NSURL* url in files) {
+        const std::string name(url.lastPathComponent.UTF8String ?: "");
+        if (!Is_Manual_Savegame_Name(name)) continue;
+
+        char description[128] = {0};
+        unsigned scenario = 0;
+        int faction = 0;
+        const bool valid = TiberianDawn_ValidateSaveGame(url.fileSystemRepresentation,
+                                                       description,
+                                                       sizeof(description),
+                                                       &scenario,
+                                                       &faction);
+        NSString* title = valid && description[0] ? @(description) : L("save_invalid");
+        NSString* side = faction == 1 ? @"Nod" : @"GDI";
+        NSString* detail = valid
+            ? [NSString stringWithFormat:@"%@ · Mission %u · %@", side, scenario, url.lastPathComponent]
+            : [NSString stringWithFormat:L("save_excluded_format"), url.lastPathComponent];
+        [records addObject:@{
+            @"url": url,
+            @"name": url.lastPathComponent,
+            @"title": title,
+            @"detail": detail,
+            @"valid": @(valid),
+            @"scenario": @(scenario),
+            @"faction": side,
+            @"slot": @(Manual_Savegame_Slot(name))
+        }];
+    }
+    [records sortUsingComparator:^NSComparisonResult(NSDictionary* left, NSDictionary* right) {
+        return [left[@"slot"] compare:right[@"slot"]];
+    }];
+    return records;
+}
+
+static NSDictionary* ImportManualSaves(NSArray<NSURL*>* sources)
+{
+    NSFileManager* manager = [NSFileManager defaultManager];
+    NSURL* directory = LegacyDataURL();
+    NSError* directory_error = nil;
+    if (![manager createDirectoryAtURL:directory
+            withIntermediateDirectories:YES attributes:nil error:&directory_error]) {
+        return @{@"count": @0, @"errors": @[[directory_error localizedDescription]]};
+    }
+
+    NSUInteger imported = 0;
+    NSMutableArray<NSString*>* errors = [NSMutableArray array];
+    for (NSURL* source in sources) {
+        const bool accessed = [source startAccessingSecurityScopedResource];
+        @autoreleasepool {
+            try {
+                NSNumber* regular = nil;
+                NSNumber* size = nil;
+                NSError* resource_error = nil;
+                if (![source getResourceValue:&regular forKey:NSURLIsRegularFileKey error:&resource_error]
+                    || !regular.boolValue
+                    || ![source getResourceValue:&size forKey:NSURLFileSizeKey error:&resource_error]
+                    || size.unsignedLongLongValue == 0
+                    || size.unsignedLongLongValue > 128ULL * 1024ULL * 1024ULL) {
+                    throw std::runtime_error(L("error_save_file").UTF8String);
+                }
+
+                NSArray<NSString*>* existing = [manager contentsOfDirectoryAtPath:directory.path error:nil];
+                std::vector<std::string> names;
+                for (NSString* name in existing) names.push_back(name.UTF8String ?: "");
+                const int slot = First_Free_Manual_Savegame_Slot(names);
+                if (slot < 0) throw std::runtime_error(L("error_save_slots").UTF8String);
+
+                NSURL* temporary = [directory URLByAppendingPathComponent:@".savegame.importing"];
+                NSURL* destination = [directory URLByAppendingPathComponent:@(Manual_Savegame_Name(slot).c_str())];
+                [manager removeItemAtURL:temporary error:nil];
+                NSError* copy_error = nil;
+                if (![manager copyItemAtURL:source toURL:temporary error:&copy_error]) {
+                    throw std::runtime_error(copy_error.localizedDescription.UTF8String);
+                }
+
+                char description[128] = {0};
+                unsigned scenario = 0;
+                int faction = 0;
+                if (!TiberianDawn_ValidateSaveGame(temporary.fileSystemRepresentation,
+                                                description,
+                                                sizeof(description),
+                                                &scenario,
+                                                &faction)) {
+                    [manager removeItemAtURL:temporary error:nil];
+                    throw std::runtime_error(L("error_save_incompatible").UTF8String);
+                }
+                if (!SyncSavePath(temporary.fileSystemRepresentation, false)) {
+                    [manager removeItemAtURL:temporary error:nil];
+                    throw std::runtime_error(L("error_save_sync").UTF8String);
+                }
+                if (rename(temporary.fileSystemRepresentation, destination.fileSystemRepresentation) != 0) {
+                    [manager removeItemAtURL:temporary error:nil];
+                    throw std::runtime_error(L("error_save_atomic").UTF8String);
+                }
+                SyncSavePath(directory.fileSystemRepresentation, true);
+                ++imported;
+            } catch (const std::exception& error) {
+                [manager removeItemAtURL:[directory URLByAppendingPathComponent:@".savegame.importing"] error:nil];
+                [errors addObject:[NSString stringWithFormat:@"%@: %s", source.lastPathComponent, error.what()]];
+            }
+        }
+        if (accessed) [source stopAccessingSecurityScopedResource];
+    }
+    return @{@"count": @(imported), @"errors": errors};
+}
+
+static NSArray<NSURL*>* PrepareSaveExports(NSArray<NSDictionary*>* records, NSString** failure)
+{
+    NSFileManager* manager = [NSFileManager defaultManager];
+    NSURL* directory = [[NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES]
+        URLByAppendingPathComponent:@"TiberianDawn-Save-Export" isDirectory:YES];
+    [manager removeItemAtURL:directory error:nil];
+    NSError* error = nil;
+    if (![manager createDirectoryAtURL:directory withIntermediateDirectories:YES attributes:nil error:&error]) {
+        if (failure) *failure = error.localizedDescription;
+        return @[];
+    }
+
+    NSMutableArray<NSURL*>* exports = [NSMutableArray array];
+    for (NSDictionary* record in records) {
+        if (![record[@"valid"] boolValue]) continue;
+        const std::string name = Savegame_Export_Name([record[@"title"] UTF8String] ?: "",
+                                                       [record[@"faction"] UTF8String] ?: "",
+                                                       [record[@"scenario"] unsignedIntValue],
+                                                       [record[@"slot"] intValue]);
+        NSURL* destination = [directory URLByAppendingPathComponent:@(name.c_str())];
+        if (![manager copyItemAtURL:record[@"url"] toURL:destination error:&error]) {
+            [manager removeItemAtURL:directory error:nil];
+            if (failure) *failure = error.localizedDescription;
+            return @[];
+        }
+        [exports addObject:destination];
+    }
+    if (exports.count == 0 && failure) *failure = L("save_no_export");
+    return exports;
+}
+
+@interface TiberianDawnSaveManagerController : UIViewController <UITableViewDataSource, UITableViewDelegate, UIDocumentPickerDelegate>
+@property(nonatomic, strong) NSArray<NSDictionary*>* saves;
+@property(nonatomic, strong) UITableView* table;
+@property(nonatomic, strong) UILabel* statusLabel;
+@property(nonatomic, strong) UIButton* importButton;
+@property(nonatomic, strong) UIButton* exportButton;
+@property(nonatomic, strong) UIButton* closeButton;
+@property(nonatomic, strong) NSArray<NSURL*>* exportTemporaryURLs;
+@property(nonatomic) BOOL awaitingImport;
+@property(nonatomic) BOOL busy;
+@property(nonatomic) BOOL finished;
+@end
+
+@implementation TiberianDawnSaveManagerController
+
+- (UIButton*)actionButton:(NSString*)title selector:(SEL)selector primary:(BOOL)primary
+{
+    UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
+    [button setTitle:title forState:UIControlStateNormal];
+    button.titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+    button.titleLabel.adjustsFontForContentSizeCategory = YES;
+    button.layer.cornerRadius = 10;
+    button.backgroundColor = primary ? [UIColor colorWithRed:0.88 green:0.62 blue:0.10 alpha:1.0]
+                                     : [UIColor colorWithWhite:0.16 alpha:1.0];
+    [button setTitleColor:primary ? [UIColor colorWithWhite:0.03 alpha:1.0] : UIColor.whiteColor
+                 forState:UIControlStateNormal];
+    [button.heightAnchor constraintGreaterThanOrEqualToConstant:48].active = YES;
+    [button addTarget:self action:selector forControlEvents:UIControlEventTouchUpInside];
+    return button;
+}
+
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor colorWithRed:0.035 green:0.055 blue:0.055 alpha:1.0];
+
+    UILabel* title = [UILabel new];
+    title.translatesAutoresizingMaskIntoConstraints = NO;
+    title.text = L("save_manager_title");
+    title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleLargeTitle];
+    title.adjustsFontForContentSizeCategory = YES;
+    title.textColor = UIColor.whiteColor;
+
+    UILabel* explanation = [UILabel new];
+    explanation.translatesAutoresizingMaskIntoConstraints = NO;
+    explanation.text = L("save_manager_explanation");
+    explanation.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+    explanation.adjustsFontForContentSizeCategory = YES;
+    explanation.textColor = [UIColor colorWithWhite:0.76 alpha:1.0];
+    explanation.numberOfLines = 0;
+
+    self.statusLabel = [UILabel new];
+    self.statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.statusLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
+    self.statusLabel.adjustsFontForContentSizeCategory = YES;
+    self.statusLabel.textColor = [UIColor colorWithWhite:0.65 alpha:1.0];
+    self.statusLabel.numberOfLines = 0;
+
+    self.table = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
+    self.table.translatesAutoresizingMaskIntoConstraints = NO;
+    self.table.backgroundColor = UIColor.clearColor;
+    self.table.dataSource = self;
+    self.table.delegate = self;
+    self.table.allowsMultipleSelection = NO;
+
+    self.importButton = [self actionButton:L("import") selector:@selector(importSaves:) primary:YES];
+    self.exportButton = [self actionButton:L("export") selector:@selector(chooseExport:) primary:NO];
+    self.closeButton = [self actionButton:L("done") selector:@selector(closeManager:) primary:NO];
+    UIStackView* actions = [[UIStackView alloc] initWithArrangedSubviews:@[self.importButton, self.exportButton, self.closeButton]];
+    actions.translatesAutoresizingMaskIntoConstraints = NO;
+    actions.axis = UILayoutConstraintAxisHorizontal;
+    actions.distribution = UIStackViewDistributionFillEqually;
+    actions.spacing = 10;
+
+    [self.view addSubview:title];
+    [self.view addSubview:explanation];
+    [self.view addSubview:self.statusLabel];
+    [self.view addSubview:self.table];
+    [self.view addSubview:actions];
+    UILayoutGuide* safe = self.view.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [title.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:24],
+        [title.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-24],
+        [title.topAnchor constraintEqualToAnchor:safe.topAnchor constant:20],
+        [explanation.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
+        [explanation.trailingAnchor constraintEqualToAnchor:title.trailingAnchor],
+        [explanation.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:10],
+        [self.statusLabel.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
+        [self.statusLabel.trailingAnchor constraintEqualToAnchor:title.trailingAnchor],
+        [self.statusLabel.topAnchor constraintEqualToAnchor:explanation.bottomAnchor constant:8],
+        [self.table.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor],
+        [self.table.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor],
+        [self.table.topAnchor constraintEqualToAnchor:self.statusLabel.bottomAnchor constant:4],
+        [self.table.bottomAnchor constraintEqualToAnchor:actions.topAnchor constant:-8],
+        [actions.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:20],
+        [actions.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-20],
+        [actions.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-16]
+    ]];
+    [self reloadSaves];
+    UIAccessibilityPostNotification(UIAccessibilityScreenChangedNotification, title);
+}
+
+- (void)reloadSaves
+{
+    self.saves = LoadManualSaveRecords();
+    [self.table reloadData];
+    NSUInteger valid = 0;
+    for (NSDictionary* record in self.saves) if ([record[@"valid"] boolValue]) ++valid;
+    self.statusLabel.text = valid == 0
+        ? L("save_none")
+        : [NSString stringWithFormat:L("save_count_format"),
+                                     (unsigned long)valid];
+    self.exportButton.enabled = valid > 0;
+    self.exportButton.alpha = self.exportButton.enabled ? 1.0 : 0.45;
+}
+
+- (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section { return self.saves.count; }
+
+- (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath
+{
+    static NSString* identifier = @"SaveCell";
+    UITableViewCell* cell = [tableView dequeueReusableCellWithIdentifier:identifier];
+    if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:identifier];
+    NSDictionary* record = self.saves[indexPath.row];
+    cell.textLabel.text = record[@"title"];
+    cell.detailTextLabel.text = record[@"detail"];
+    cell.textLabel.textColor = [record[@"valid"] boolValue] ? UIColor.labelColor : UIColor.systemRedColor;
+    cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+    cell.accessoryType = [record[@"valid"] boolValue] ? UITableViewCellAccessoryNone : UITableViewCellAccessoryDetailButton;
+    return cell;
+}
+
+- (void)setBusyState:(BOOL)busy text:(NSString*)text
+{
+    self.busy = busy;
+    self.importButton.enabled = !busy;
+    self.exportButton.enabled = !busy && self.saves.count > 0;
+    self.closeButton.enabled = !busy;
+    if (text) self.statusLabel.text = text;
+}
+
+- (void)showAlert:(NSString*)title message:(NSString*)message
+{
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:L("ok") style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)importSaves:(id)sender
+{
+    self.awaitingImport = YES;
+    UTType* saveType = [UTType typeWithIdentifier:@"org.tiberiandawn.cncsave"];
+    NSArray<UTType*>* types = saveType ? @[saveType, UTTypeData] : @[UTTypeData];
+    UIDocumentPickerViewController* picker = [[UIDocumentPickerViewController alloc]
+        initForOpeningContentTypes:types asCopy:NO];
+    picker.allowsMultipleSelection = YES;
+    picker.delegate = self;
+    picker.title = L("save_picker_import");
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)chooseExport:(id)sender
+{
+    NSIndexPath* selected = self.table.indexPathForSelectedRow;
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:L("save_export_title")
+        message:L("save_export_message")
+        preferredStyle:UIAlertControllerStyleAlert];
+    if (selected && [self.saves[selected.row][@"valid"] boolValue]) {
+        [alert addAction:[UIAlertAction actionWithTitle:L("selected")
+            style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+                [self exportRecords:@[self.saves[selected.row]]];
+            }]];
+    }
+    [alert addAction:[UIAlertAction actionWithTitle:L("all_valid")
+        style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) { [self exportRecords:self.saves]; }]];
+    [alert addAction:[UIAlertAction actionWithTitle:L("cancel") style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)exportRecords:(NSArray<NSDictionary*>*)records
+{
+    NSString* failure = nil;
+    NSArray<NSURL*>* urls = PrepareSaveExports(records, &failure);
+    if (urls.count == 0) {
+        [self showAlert:L("export_unavailable") message:failure ?: L("no_valid_saves")];
+        return;
+    }
+    self.awaitingImport = NO;
+    self.exportTemporaryURLs = urls;
+    UIDocumentPickerViewController* picker = [[UIDocumentPickerViewController alloc]
+        initForExportingURLs:urls asCopy:YES];
+    picker.delegate = self;
+    picker.title = L("save_picker_export");
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)cleanupExports
+{
+    if (self.exportTemporaryURLs.count > 0) {
+        NSURL* directory = [self.exportTemporaryURLs.firstObject URLByDeletingLastPathComponent];
+        [[NSFileManager defaultManager] removeItemAtURL:directory error:nil];
+    }
+    self.exportTemporaryURLs = nil;
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController*)controller didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls
+{
+    if (!self.awaitingImport) {
+        [self cleanupExports];
+        [self showAlert:L("export_complete") message:L("export_complete_message")];
+        return;
+    }
+    self.awaitingImport = NO;
+    [self setBusyState:YES text:L("save_import_busy")];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSDictionary* result = ImportManualSaves(urls);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self setBusyState:NO text:nil];
+            [self reloadSaves];
+            const NSUInteger count = [result[@"count"] unsignedIntegerValue];
+            NSArray<NSString*>* errors = result[@"errors"];
+            NSString* message = [NSString stringWithFormat:L("save_import_count_format"), (unsigned long)count];
+            if (errors.count > 0) {
+                message = [message stringByAppendingFormat:L("save_not_imported_format"), [errors componentsJoinedByString:@"\n"]];
+            }
+            [self showAlert:count > 0 ? L("import_complete") : L("import_unavailable") message:message];
+        });
+    });
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)controller
+{
+    if (!self.awaitingImport) [self cleanupExports];
+    self.awaitingImport = NO;
+}
+
+- (void)closeManager:(id)sender
+{
+    if (!self.busy) self.finished = YES;
+}
+@end
+
 namespace
 {
 
@@ -582,7 +880,7 @@ NSArray<NSURL*>* PickSources()
 {
     __block NSArray<NSURL*>* result = nil;
     void (^present)(void) = ^{
-        TiberianDawnForiPadImportGuideController* guide = [TiberianDawnForiPadImportGuideController new];
+        TiberianDawnImportGuideController* guide = [TiberianDawnImportGuideController new];
 
         UIWindowScene* scene = nil;
         for (UIScene* candidate in UIApplication.sharedApplication.connectedScenes) {
@@ -638,7 +936,7 @@ void RunImportTask(NSString* status, const std::function<void()>& operation)
 
     UILabel* title = [UILabel new];
     title.translatesAutoresizingMaskIntoConstraints = NO;
-    title.text = @"Spieldaten werden eingerichtet";
+    title.text = L("import_progress_title");
     title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleTitle1];
     title.textColor = UIColor.whiteColor;
     title.textAlignment = NSTextAlignmentCenter;
@@ -656,7 +954,7 @@ void RunImportTask(NSString* status, const std::function<void()>& operation)
 
     UILabel* note = [UILabel new];
     note.translatesAutoresizingMaskIntoConstraints = NO;
-    note.text = @"Bitte die App geöffnet lassen. Die ISO-Dateien werden nur gelesen und nicht kopiert oder hochgeladen.";
+    note.text = L("import_progress_note");
     note.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
     note.textColor = [UIColor colorWithWhite:0.62 alpha:1.0];
     note.textAlignment = NSTextAlignmentCenter;
@@ -687,7 +985,7 @@ void RunImportTask(NSString* status, const std::function<void()>& operation)
             } catch (const std::exception& error) {
                 localFailure = @(error.what());
             } catch (...) {
-                localFailure = @"Unbekannter Fehler beim Import";
+                localFailure = L("error_unknown_import");
             }
         }
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -717,18 +1015,16 @@ bool ShowImportError(NSString* error)
     host.windowLevel = UIWindowLevelAlert;
     [host makeKeyAndVisible];
 
-    NSString* help = [NSString stringWithFormat:
-        @"%@\n\nPrüfe bitte:\n• GDI- und Nod-Gold-ISO gemeinsam ausgewählt\n• Dateien vollständig auf dem iPad, in iCloud Drive oder auf USB verfügbar\n• mindestens 1,2 GB freier Speicher\n\nAndere C&C-Ausgaben werden nicht unterstützt.",
-        error];
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Import nicht abgeschlossen"
+    NSString* help = [NSString stringWithFormat:L("import_help_format"), error];
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:L("import_not_completed")
                                                                     message:help
                                                              preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Später"
+    [alert addAction:[UIAlertAction actionWithTitle:L("later")
                                               style:UIAlertActionStyleCancel
                                             handler:^(UIAlertAction* action) {
         finished = YES;
     }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Erneut versuchen"
+    [alert addAction:[UIAlertAction actionWithTitle:L("retry")
                                               style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction* action) {
         retry = YES;
@@ -752,10 +1048,10 @@ void ShowImportCompleted(void)
     host.rootViewController = controller;
     host.windowLevel = UIWindowLevelAlert;
     [host makeKeyAndVisible];
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Import abgeschlossen"
-        message:@"GDI- und Nod-Daten wurden geprüft und sicher installiert. Spielstände und Einstellungen bleiben getrennt in Dateien zugänglich."
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:L("import_complete")
+        message:L("import_completed_message")
         preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Spiel starten"
+    [alert addAction:[UIAlertAction actionWithTitle:L("start_game")
                                               style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction* action) {
         finished = YES;
@@ -772,7 +1068,7 @@ void ShowMessage(NSString* title, NSString* message)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, message);
-        NSLog(@"Tiberian Dawn for iPad: %@: %@", title, message);
+        NSLog(@"Tiberian Dawn: %@: %@", title, message);
     });
 }
 
@@ -782,7 +1078,7 @@ UILabel* CompactWarningLabel()
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         label = [UILabel new];
-        label.text = @"Fenster vergroessern – die Spielflaeche ist hier zu klein";
+        label.text = L("compact_warning");
         label.textAlignment = NSTextAlignmentCenter;
         label.numberOfLines = 2;
         label.textColor = UIColor.whiteColor;
@@ -797,11 +1093,48 @@ UILabel* CompactWarningLabel()
 }
 }
 
-bool TiberianDawnForiPad_PrepareGameData(void)
+int TiberianDawn_GetLanguagePreference(void)
+{
+    return StoredLanguagePreference();
+}
+
+int TiberianDawn_GetEffectiveLanguage(void)
+{
+    return static_cast<int>(EffectiveLanguage());
+}
+
+void TiberianDawn_CycleLanguagePreference(void)
+{
+    const int next = (StoredLanguagePreference() + 1) % 3;
+    [[NSUserDefaults standardUserDefaults] setInteger:next forKey:LanguagePreferenceKey];
+}
+
+const char* TiberianDawn_LocalizedText(const char* key)
+{
+    return IPad_Localized_Text(EffectiveLanguage(), key);
+}
+
+const char* TiberianDawn_LanguagePreferenceLabel(void)
+{
+    switch (StoredLanguagePreference()) {
+    case IPAD_LANGUAGE_GERMAN:
+        return TiberianDawn_LocalizedText("language_german");
+    case IPAD_LANGUAGE_ENGLISH:
+        return TiberianDawn_LocalizedText("language_english");
+    default:
+        return TiberianDawn_LocalizedText("language_system");
+    }
+}
+
+const char* TiberianDawn_ClassicLanguageExtension(void)
+{
+    return EffectiveLanguage() == IPAD_EFFECTIVE_GERMAN ? "GER" : "ENG";
+}
+
+bool TiberianDawn_PrepareGameData(void)
 {
     @autoreleasepool {
-        TiberianDawnForiPad_ConfigureAudioSession();
-        MigratePreviousProductDirectories();
+        TiberianDawn_ConfigureAudioSession();
         NSURL* destination = LibraryDataURL();
         if (ValidData(destination)) {
             ExcludeFromBackup(destination);
@@ -814,22 +1147,22 @@ bool TiberianDawnForiPad_PrepareGameData(void)
         NSURL* staging = [parent URLByAppendingPathComponent:@"vanillatd.importing" isDirectory:YES];
         [manager removeItemAtURL:staging error:nil];
 
-        NSURL* documentsData = DocumentsDataURL();
-        while (ValidData(documentsData)) {
+        NSURL* legacy = LegacyDataURL();
+        while (ValidData(legacy)) {
             try {
-                RunImportTask(@"Vorhandene Spieldaten werden geprüft und in den optimierten Speicher verschoben.", [&] {
+                RunImportTask(L("migration_status"), [&] {
                     EnsureImportCapacity(parent);
                     [manager removeItemAtURL:staging error:nil];
-                    CopyPreparedDirectory(documentsData, staging);
-                    if (!ValidData(staging)) throw std::runtime_error("Die Migration ist unvollständig");
+                    CopyPreparedDirectory(legacy, staging);
+                    if (!ValidData(staging)) throw std::runtime_error(L("error_migration_incomplete").UTF8String);
                     AtomicInstall(staging, destination);
                     // Remove only immutable assets after the verified copy. Saves and INI files remain visible in Documents.
-                    NSArray<NSString*>* assets = [manager contentsOfDirectoryAtPath:documentsData.path error:nil];
+                    NSArray<NSString*>* assets = [manager contentsOfDirectoryAtPath:legacy.path error:nil];
                     for (NSString* name in assets) {
                         if ([name.pathExtension caseInsensitiveCompare:@"MIX"] == NSOrderedSame
                             || [name caseInsensitiveCompare:@"gdi"] == NSOrderedSame
                             || [name caseInsensitiveCompare:@"nod"] == NSOrderedSame) {
-                            [manager removeItemAtURL:[documentsData URLByAppendingPathComponent:name] error:nil];
+                            [manager removeItemAtURL:[legacy URLByAppendingPathComponent:name] error:nil];
                         }
                     }
                 });
@@ -844,7 +1177,7 @@ bool TiberianDawnForiPad_PrepareGameData(void)
             NSArray<NSURL*>* selected = PickSources();
             if (selected.count == 0) return false;
             try {
-                RunImportTask(@"Die ausgewählten Quellen werden gelesen, extrahiert und vollständig geprüft.", [&] {
+                RunImportTask(L("import_sources_status"), [&] {
                     EnsureImportCapacity(parent);
                     [manager removeItemAtURL:staging error:nil];
                     NSURL* first = selected.firstObject;
@@ -863,7 +1196,7 @@ bool TiberianDawnForiPad_PrepareGameData(void)
                         ExtractISOs(selected, staging);
                     }
                     if (!ValidData(staging)) {
-                        throw std::runtime_error("Die Quellen enthalten nicht alle benötigten C&C-Gold-Dateien");
+                        throw std::runtime_error(L("error_sources_incomplete").UTF8String);
                     }
                     AtomicInstall(staging, destination);
                 });
@@ -877,7 +1210,30 @@ bool TiberianDawnForiPad_PrepareGameData(void)
     }
 }
 
-void TiberianDawnForiPad_ConfigureAudioSession(void)
+void TiberianDawn_ManageSaveGames(void)
+{
+    @autoreleasepool {
+        void (^present)(void) = ^{
+            TiberianDawnSaveManagerController* controller = [TiberianDawnSaveManagerController new];
+            UIWindow* host = [[UIWindow alloc] initWithWindowScene:ActiveWindowScene()];
+            host.rootViewController = controller;
+            host.windowLevel = UIWindowLevelAlert;
+            [host makeKeyAndVisible];
+            while (!controller.finished) {
+                [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                          beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+            }
+            host.hidden = YES;
+        };
+        if (NSThread.isMainThread) {
+            present();
+        } else {
+            dispatch_sync(dispatch_get_main_queue(), present);
+        }
+    }
+}
+
+void TiberianDawn_ConfigureAudioSession(void)
 {
     @autoreleasepool {
         AVAudioSession* session = AVAudioSession.sharedInstance;
@@ -908,20 +1264,26 @@ void TiberianDawnForiPad_ConfigureAudioSession(void)
             }];
             [center addObserverForName:AVAudioSessionMediaServicesWereResetNotification object:session queue:NSOperationQueue.mainQueue
                             usingBlock:^(NSNotification* note) {
-                TiberianDawnForiPad_ConfigureAudioSession();
+                TiberianDawn_ConfigureAudioSession();
                 SDL_Event event = {};
                 event.type = SDL_USEREVENT;
-                event.user.code = IPADOS_EVENT_AUDIO_RESUME;
+                event.user.code = IPADOS_EVENT_AUDIO_RESET;
                 SDL_PushEvent(&event);
             }];
         });
     }
 }
 
-void TiberianDawnForiPad_SetCompactWindowWarning(bool visible)
+bool TiberianDawn_RebuildAudioEngine(void)
+{
+    return IPad_Audio_Rebuild();
+}
+
+void TiberianDawn_SetCompactWindowWarning(bool visible)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         UILabel* label = CompactWarningLabel();
+        label.text = L("compact_warning");
         UIWindow* window = UIApplication.sharedApplication.keyWindow;
         if (!window) {
             for (UIWindowScene* scene in UIApplication.sharedApplication.connectedScenes) {

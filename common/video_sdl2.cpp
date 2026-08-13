@@ -45,6 +45,7 @@
 #include "settings.h"
 #include "debugstring.h"
 #include "app_lifecycle.h"
+#include "ipados_layout.h"
 
 #include <algorithm>
 #include <atomic>
@@ -53,8 +54,17 @@
 #include <vector>
 #include <SDL.h>
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#define TIBERIAN_DAWN_APPLE_PORT 1
+#endif
+
 #ifdef IPADOS_PORT
 #include "../platform/apple/ipados_platform.h"
+#endif
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+#include "hd_asset_pack.h"
+#include "ipados_palette_renderer.h"
+#include "paths.h"
 #include <mach/mach.h>
 #include <sys/resource.h>
 #endif
@@ -69,25 +79,37 @@ static int renderer_output_w;
 static int renderer_output_h;
 static int window_points_w;
 static int window_points_h;
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+static IPadLayout ipad_layout;
+#endif
 
-#ifdef IPADOS_PORT
-extern "C" void TiberianDawnForiPad_GetSafeAreaInsets(SDL_Window* sdl_window,
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+extern "C" void TiberianDawn_GetSafeAreaInsets(SDL_Window* sdl_window,
                                               int output_width,
                                               int output_height,
                                               int* left,
                                               int* top,
                                               int* right,
                                               int* bottom);
-extern "C" int TiberianDawnForiPad_IsLowPowerModeEnabled(void);
-extern "C" int TiberianDawnForiPad_GetThermalState(void);
+extern "C" int TiberianDawn_IsLowPowerModeEnabled(void);
+extern "C" int TiberianDawn_GetThermalState(void);
+extern "C" void TiberianDawn_SetCompactWindowWarning(bool visible);
 #endif
 
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
 namespace
 {
 std::atomic<uint32_t> pending_input_timestamp(0);
+HDAssetPack modern_art_pack;
+bool modern_art_pack_checked = false;
 uint64_t palette_generation = 1;
 uint64_t cursor_generation = 1;
+int cursor_kind = 0;
+uint64_t selection_generation = 1;
+uint64_t hd_buggy_generation = 1;
+bool hd_buggy_renderer_available = false;
+bool hd_humvee_renderer_available = false;
+bool hd_minigunner_renderer_available = false;
 Uint8 previous_palette[256 * 3] = {0};
 bool has_previous_palette = false;
 bool force_present = true;
@@ -108,6 +130,118 @@ struct TouchFeedbackState
 };
 
 TouchFeedbackState touch_feedback;
+
+struct RegisteredSelectionOverlay
+{
+    const void* object = nullptr;
+    IPadPaletteRect logical = {};
+    std::uint8_t palette_index = 0;
+};
+
+std::vector<RegisteredSelectionOverlay> selection_overlays;
+
+struct RegisteredHDBuggy
+{
+    const void* object = nullptr;
+    int body_x = 0;
+    int body_y = 0;
+    int turret_x = 0;
+    int turret_y = 0;
+    int body_frame = -1;
+    int turret_frame = -1;
+    int health_x = 0;
+    int health_y = 0;
+    int health_width = 0;
+    int health_fill_width = 0;
+    std::uint8_t palette_index = 0;
+    std::uint8_t health_palette_index = 0;
+    bool health_visible = false;
+    int atlas_kind = 0;
+};
+
+std::vector<RegisteredHDBuggy> hd_buggies;
+
+struct RegisteredHDInfantry
+{
+    const void* object = nullptr;
+    int center_x = 0;
+    int center_y = 0;
+    int frame = -1;
+    int health_x = 0;
+    int health_y = 0;
+    int health_width = 0;
+    int health_fill_width = 0;
+    std::uint8_t palette_index = 0;
+    std::uint8_t health_palette_index = 0;
+    bool health_visible = false;
+};
+
+std::vector<RegisteredHDInfantry> hd_infantry;
+
+void Discover_Modern_Art_Pack()
+{
+    if (modern_art_pack_checked) return;
+    modern_art_pack_checked = true;
+    const std::string directory = Paths.Concatenate_Paths(Paths.User_Path(), "ModernArt");
+    std::string error;
+    if (modern_art_pack.Load(directory, error)) {
+        DBG_INFO("Optional HD asset pack '%s' loaded: id=%s scale=%dx assets=%zu",
+                 modern_art_pack.Manifest().Name.c_str(),
+                 modern_art_pack.Manifest().Identifier.c_str(),
+                 modern_art_pack.Manifest().Scale,
+                 modern_art_pack.Manifest().Assets.size());
+    } else {
+        if (error != "manifest.ini not found") {
+            DBG_WARN("Optional user HD asset pack rejected: %s; trying built-in proof pack", error.c_str());
+        }
+        // iPadOS places bundle resources beside the executable, while a
+        // native macOS .app keeps them in Contents/Resources.
+#ifdef MACOS_PORT
+        const std::string resources_directory = Paths.Concatenate_Paths(Paths.Program_Path(), "../Resources");
+        const std::string built_in_directory = Paths.Concatenate_Paths(resources_directory.c_str(), "ModernArt");
+#else
+        const std::string built_in_directory = Paths.Concatenate_Paths(Paths.Program_Path(), "ModernArt");
+#endif
+        if (modern_art_pack.Load(built_in_directory, error)) {
+            DBG_INFO("Built-in HD asset pack '%s' loaded: id=%s scale=%dx assets=%zu",
+                     modern_art_pack.Manifest().Name.c_str(),
+                     modern_art_pack.Manifest().Identifier.c_str(),
+                     modern_art_pack.Manifest().Scale,
+                     modern_art_pack.Manifest().Assets.size());
+        } else {
+            DBG_WARN("Built-in HD asset pack unavailable: %s; original artwork fallback active", error.c_str());
+        }
+    }
+}
+
+std::string Modern_Cursor_Path()
+{
+    const HDAssetEntry* cursor = modern_art_pack.Is_Loaded() ? modern_art_pack.Find("cursor.default") : nullptr;
+    return cursor ? modern_art_pack.Absolute_Path(*cursor) : std::string();
+}
+
+std::string Modern_Buggy_Atlas_Path()
+{
+    const HDAssetEntry* buggy = modern_art_pack.Is_Loaded() ? modern_art_pack.Find("unit.buggy") : nullptr;
+    return buggy ? modern_art_pack.Absolute_Path(*buggy) : std::string();
+}
+
+std::string Modern_Humvee_Atlas_Path()
+{
+    const HDAssetEntry* humvee = modern_art_pack.Is_Loaded() ? modern_art_pack.Find("unit.humvee") : nullptr;
+    return humvee ? modern_art_pack.Absolute_Path(*humvee) : std::string();
+}
+
+std::string Modern_Minigunner_Atlas_Path()
+{
+    const HDAssetEntry* minigunner = modern_art_pack.Is_Loaded() ? modern_art_pack.Find("infantry.minigunner") : nullptr;
+    return minigunner ? modern_art_pack.Absolute_Path(*minigunner) : std::string();
+}
+
+int Modern_Asset_Scale()
+{
+    return modern_art_pack.Is_Loaded() ? modern_art_pack.Manifest().Scale : 4;
+}
 
 struct VideoTelemetry
 {
@@ -140,8 +274,8 @@ void Update_Power_State()
     }
 
     power_state_checked_at = now;
-    const bool new_low_power_mode = TiberianDawnForiPad_IsLowPowerModeEnabled() != 0;
-    const int new_thermal_state = TiberianDawnForiPad_GetThermalState();
+    const bool new_low_power_mode = TiberianDawn_IsLowPowerModeEnabled() != 0;
+    const int new_thermal_state = TiberianDawn_GetThermalState();
     if (new_low_power_mode != low_power_mode || new_thermal_state != thermal_state) {
         low_power_mode = new_low_power_mode;
         thermal_state = new_thermal_state;
@@ -307,8 +441,8 @@ static void Update_HWCursor_Settings()
     int safe_top = 0;
     int safe_right = 0;
     int safe_bottom = 0;
-#ifdef IPADOS_PORT
-    TiberianDawnForiPad_GetSafeAreaInsets(window,
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+    TiberianDawn_GetSafeAreaInsets(window,
                                 renderer_output_w,
                                 renderer_output_h,
                                 &safe_left,
@@ -317,35 +451,24 @@ static void Update_HWCursor_Settings()
                                 &safe_bottom);
 #endif
 
-    safe_left = std::max(0, std::min(safe_left, renderer_output_w));
-    safe_top = std::max(0, std::min(safe_top, renderer_output_h));
-    safe_right = std::max(0, std::min(safe_right, renderer_output_w - safe_left));
-    safe_bottom = std::max(0, std::min(safe_bottom, renderer_output_h - safe_top));
-
-    const int available_w = std::max(1, renderer_output_w - safe_left - safe_right);
-    const int available_h = std::max(1, renderer_output_h - safe_top - safe_bottom);
-
     /*
     ** Update screen boxing settings.
     */
     float ar = (float)hwcursor.GameW / hwcursor.GameH;
-#ifdef IPADOS_PORT
-    /* The classic 640x400 surface must never be distorted on iPad. */
-    if (Settings.Video.PresentationMode == 1) {
-        const int integer_scale = std::max(1, std::min(available_w / hwcursor.GameW, available_h / hwcursor.GameH));
-        render_dst.w = hwcursor.GameW * integer_scale;
-        render_dst.h = hwcursor.GameH * integer_scale;
-    } else {
-        render_dst.w = available_w;
-        render_dst.h = static_cast<int>(render_dst.w / ar + 0.5f);
-        if (render_dst.h > available_h) {
-            render_dst.h = available_h;
-            render_dst.w = static_cast<int>(render_dst.h * ar + 0.5f);
-        }
-    }
-    render_dst.x = safe_left + (available_w - render_dst.w) / 2;
-    render_dst.y = safe_top + (available_h - render_dst.h) / 2;
-    TiberianDawnForiPad_SetCompactWindowWarning(window_points_w < 640 || window_points_h < 400);
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+    ipad_layout = Calculate_IPad_Layout(renderer_output_w,
+                                        renderer_output_h,
+                                        window_points_w,
+                                        window_points_h,
+                                        hwcursor.GameW,
+                                        hwcursor.GameH,
+                                        {safe_left, safe_top, safe_right, safe_bottom},
+                                        Settings.Video.PresentationMode == 1);
+    render_dst.x = ipad_layout.viewport.x;
+    render_dst.y = ipad_layout.viewport.y;
+    render_dst.w = ipad_layout.viewport.width;
+    render_dst.h = ipad_layout.viewport.height;
+    TiberianDawn_SetCompactWindowWarning(ipad_layout.compact);
 #else
     if (Settings.Video.Boxing) {
         size_t colonPos = Settings.Video.BoxingAspectRatio.find(":");
@@ -462,6 +585,8 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     Settings.Video.Windowed = true;
     Settings.Mouse.RawInput = false;
     win_flags = SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+#elif defined(MACOS_PORT)
+    win_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 #else
     if (!Settings.Video.Windowed) {
         /*
@@ -485,8 +610,13 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     }
 #endif
 
-    window =
-        SDL_CreateWindow("Vanilla Conquer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, win_w, win_h, win_flags);
+    const char* window_title =
+#ifdef MACOS_PORT
+        "Tiberian Dawn";
+#else
+        "Vanilla Conquer";
+#endif
+    window = SDL_CreateWindow(window_title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, win_w, win_h, win_flags);
     if (window == nullptr) {
         DBG_ERROR("SDL_CreateWindow failed: %s", SDL_GetError());
         Reset_Video_Mode();
@@ -520,7 +650,7 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     }
 
     Uint32 renderer_flags = SDL_RENDERER_TARGETTEXTURE;
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
     renderer_flags |= SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
 #endif
     renderer = SDL_CreateRenderer(window, renderer_index, renderer_flags);
@@ -538,6 +668,9 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     }
 
     DBG_INFO("Initialized SDL2 driver '%s'", info.name);
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+    Discover_Modern_Art_Pack();
+#endif
     DBG_INFO("  flags:");
     if (info.flags & SDL_RENDERER_SOFTWARE) {
         DBG_INFO("    SDL_RENDERER_SOFTWARE");
@@ -600,11 +733,11 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     ** Init gamepad.
     */
     if (Settings.Mouse.ControllerEnabled
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
         || true
 #endif
     ) {
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
         Settings.Mouse.ControllerEnabled = true;
 #endif
         SDL_Init(SDL_INIT_GAMECONTROLLER);
@@ -641,7 +774,7 @@ void Toggle_Video_Fullscreen()
 
 void Refresh_Video_Layout()
 {
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
     force_present = true;
 #endif
     Update_HWCursor_Settings();
@@ -726,7 +859,7 @@ void Get_Video_Mouse(int& x, int& y)
         int window_x = 0;
         int window_y = 0;
         SDL_GetMouseState(&window_x, &window_y);
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
         Set_Video_Mouse_Window(window_x, window_y, x, y);
 #else
         x = window_x / hwcursor.ScaleX;
@@ -735,16 +868,10 @@ void Get_Video_Mouse(int& x, int& y)
     }
 }
 
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
 static void Set_Video_Mouse_Output(float pixel_x, float pixel_y, int& game_x, int& game_y)
 {
-    const float scale_x = render_dst.w > 0 ? render_dst.w / static_cast<float>(hwcursor.GameW) : 1.0f;
-    const float scale_y = render_dst.h > 0 ? render_dst.h / static_cast<float>(hwcursor.GameH) : 1.0f;
-
-    game_x = static_cast<int>((pixel_x - render_dst.x) / scale_x);
-    game_y = static_cast<int>((pixel_y - render_dst.y) / scale_y);
-    game_x = std::max(0, std::min(game_x, hwcursor.GameW - 1));
-    game_y = std::max(0, std::min(game_y, hwcursor.GameH - 1));
+    Map_IPad_Output_Point(ipad_layout, pixel_x, pixel_y, game_x, game_y);
     hwcursor.X = game_x;
     hwcursor.Y = game_y;
 }
@@ -755,9 +882,9 @@ void Set_Video_Mouse_Window(float window_x, float window_y, int& game_x, int& ga
         Refresh_Video_Layout();
     }
 
-    const float pixel_x = window_x * renderer_output_w / static_cast<float>(std::max(1, window_points_w));
-    const float pixel_y = window_y * renderer_output_h / static_cast<float>(std::max(1, window_points_h));
-    Set_Video_Mouse_Output(pixel_x, pixel_y, game_x, game_y);
+    Map_IPad_Window_Point(ipad_layout, window_x, window_y, game_x, game_y);
+    hwcursor.X = game_x;
+    hwcursor.Y = game_y;
 }
 
 void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& game_x, int& game_y)
@@ -766,7 +893,9 @@ void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& gam
         Refresh_Video_Layout();
     }
 
-    Set_Video_Mouse_Output(normalized_x * renderer_output_w, normalized_y * renderer_output_h, game_x, game_y);
+    Map_IPad_Normalized_Point(ipad_layout, normalized_x, normalized_y, game_x, game_y);
+    hwcursor.X = game_x;
+    hwcursor.Y = game_y;
 }
 #endif
 
@@ -784,6 +913,13 @@ void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& gam
  *=============================================================================================*/
 void Reset_Video_Mode(void)
 {
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+    selection_overlays.clear();
+    ++selection_generation;
+    hd_buggies.clear();
+    hd_infantry.clear();
+    ++hd_buggy_generation;
+#endif
     if (hwcursor.Pending) {
         SDL_FreeCursor(hwcursor.Pending);
         hwcursor.Pending = nullptr;
@@ -885,13 +1021,24 @@ void Set_Video_Cursor(void* cursor, int w, int h, int hotx, int hoty)
     hwcursor.HotX = hotx;
     hwcursor.HotY = hoty;
 
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
     ++cursor_generation;
     force_present = true;
 #endif
 
     Update_HWCursor();
 }
+
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+void Video_Set_Cursor_Kind(int kind)
+{
+    const int normalized = kind == 1 ? 1 : 0;
+    if (cursor_kind == normalized) return;
+    cursor_kind = normalized;
+    ++cursor_generation;
+    force_present = true;
+}
+#endif
 
 /***********************************************************************************************
  * Get_Free_Video_Memory -- returns amount of free video memory                                *
@@ -962,7 +1109,7 @@ void Wait_Vert_Blank(void)
  *=============================================================================================*/
 void Set_DD_Palette(void* rpalette)
 {
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
     if (has_previous_palette && std::memcmp(previous_palette, rpalette, sizeof(previous_palette)) == 0) {
         return;
     }
@@ -987,7 +1134,7 @@ void Set_DD_Palette(void* rpalette)
 
     SDL_SetPaletteColors(palette, colors, 0, 256);
 
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
     ++palette_generation;
     force_present = true;
 #endif
@@ -1050,14 +1197,17 @@ public:
         : flags(flags)
         , windowSurface(nullptr)
         , texture(nullptr)
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
         , lastPaletteGeneration(0)
         , lastCursorGeneration(0)
+        , lastSelectionGeneration(0)
+        , lastHDBuggyGeneration(0)
         , lastTouchFeedbackGeneration(0)
         , lastCursorX(-1)
         , lastCursorY(-1)
         , hadSoftwareCursor(false)
         , hasLastFrame(false)
+        , paletteRenderer(nullptr)
 #endif
     {
         surface = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
@@ -1066,6 +1216,23 @@ public:
         if (flags & GBC_VISIBLE) {
             windowSurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, SDL_BITSPERPIXEL(pixel_format), pixel_format);
             texture = SDL_CreateTexture(renderer, windowSurface->format->format, SDL_TEXTUREACCESS_STREAMING, w, h);
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+            const std::string modern_cursor_path = Modern_Cursor_Path();
+            const std::string buggy_atlas_path = Modern_Buggy_Atlas_Path();
+            const std::string humvee_atlas_path = Modern_Humvee_Atlas_Path();
+            const std::string minigunner_atlas_path = Modern_Minigunner_Atlas_Path();
+            paletteRenderer = IPad_Palette_Create(renderer,
+                                                  w,
+                                                  h,
+                                                  modern_cursor_path.c_str(),
+                                                  buggy_atlas_path.c_str(),
+                                                  humvee_atlas_path.c_str(),
+                                                  minigunner_atlas_path.c_str(),
+                                                  Modern_Asset_Scale());
+            hd_buggy_renderer_available = IPad_Palette_Has_Buggy_Artwork(paletteRenderer);
+            hd_humvee_renderer_available = IPad_Palette_Has_Humvee_Artwork(paletteRenderer);
+            hd_minigunner_renderer_available = IPad_Palette_Has_Minigunner_Artwork(paletteRenderer);
+#endif
             frontSurface = this;
         }
     }
@@ -1074,7 +1241,17 @@ public:
     {
         if (frontSurface == this) {
             frontSurface = nullptr;
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+            hd_buggy_renderer_available = false;
+            hd_humvee_renderer_available = false;
+            hd_minigunner_renderer_available = false;
+#endif
         }
+
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+        IPad_Palette_Destroy(paletteRenderer);
+        paletteRenderer = nullptr;
+#endif
 
         SDL_FreeSurface(surface);
 
@@ -1136,7 +1313,7 @@ public:
         void* pixels;
         int pitch;
 
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
         ++telemetry.attempts;
         Update_Power_State();
         if (touch_feedback.active
@@ -1162,20 +1339,38 @@ public:
             Get_Video_Mouse(cursor_x, cursor_y);
         }
 
+        IPadPaletteRect indexed_update = {0, 0, surface->w, surface->h};
         bool indexed_pixels_changed = !hasLastFrame;
-        if (!indexed_pixels_changed) {
+        if (hasLastFrame) {
+            int left = surface->w;
+            int top = surface->h;
+            int right = -1;
+            int bottom = -1;
             for (int y = 0; y < surface->h; ++y) {
                 const Uint8* row = static_cast<const Uint8*>(surface->pixels) + y * surface->pitch;
-                if (std::memcmp(row, &lastIndexedPixels[y * surface->w], surface->w) != 0) {
-                    indexed_pixels_changed = true;
-                    break;
-                }
+                const Uint8* previous = &lastIndexedPixels[y * surface->w];
+                if (std::memcmp(row, previous, surface->w) == 0) continue;
+
+                int row_left = 0;
+                while (row_left < surface->w && row[row_left] == previous[row_left]) ++row_left;
+                int row_right = surface->w - 1;
+                while (row_right > row_left && row[row_right] == previous[row_right]) --row_right;
+                left = std::min(left, row_left);
+                top = std::min(top, y);
+                right = std::max(right, row_right);
+                bottom = y;
             }
+            indexed_pixels_changed = right >= left && bottom >= top;
+            indexed_update = indexed_pixels_changed
+                                 ? IPadPaletteRect{left, top, right - left + 1, bottom - top + 1}
+                                 : IPadPaletteRect{0, 0, 0, 0};
         }
 
         const bool visible_change = force_present || indexed_pixels_changed
                                     || lastPaletteGeneration != palette_generation
                                     || lastCursorGeneration != cursor_generation
+                                    || lastSelectionGeneration != selection_generation
+                                    || lastHDBuggyGeneration != hd_buggy_generation
                                     || lastTouchFeedbackGeneration != touch_feedback.generation
                                     || hadSoftwareCursor != software_cursor || lastCursorX != cursor_x
                                     || lastCursorY != cursor_y;
@@ -1188,60 +1383,229 @@ public:
 
         if (indexed_pixels_changed) {
             lastIndexedPixels.resize(surface->w * surface->h);
-            for (int y = 0; y < surface->h; ++y) {
+            for (int y = indexed_update.y; y < indexed_update.y + indexed_update.height; ++y) {
                 const Uint8* row = static_cast<const Uint8*>(surface->pixels) + y * surface->pitch;
-                std::memcpy(&lastIndexedPixels[y * surface->w], row, surface->w);
+                std::memcpy(&lastIndexedPixels[y * surface->w + indexed_update.x],
+                            row + indexed_update.x,
+                            indexed_update.width);
             }
         }
 #endif
 
-        SDL_BlitSurface(surface, NULL, windowSurface, NULL);
-
-        if (Settings.Video.HardwareCursor) {
-            /*
-            ** Swap cursor before a frame is drawn. This reduces flickering when it's done only once per frame.
-            */
-            if (hwcursor.Pending) {
-                SDL_SetCursor(hwcursor.Pending);
-
-                if (hwcursor.Current) {
-                    SDL_FreeCursor(hwcursor.Current);
-                }
-
-                hwcursor.Current = hwcursor.Pending;
-                hwcursor.Pending = nullptr;
-            }
-
-            /*
-            ** Update hardware cursor visibility.
-            */
-            SDL_ShowCursor(!Get_Mouse_State());
-        } else if (!Get_Mouse_State() && hwcursor.Surface != nullptr) {
-            /*
-            ** Draw software emulated cursor.
-            */
-            int x, y;
-            SDL_Rect dst;
-
-            Get_Video_Mouse(x, y);
-
-            const float cursor_scale = Settings.Video.LargeCursor ? 1.5f : 1.0f;
-            dst.x = x - static_cast<int>(hwcursor.HotX * cursor_scale);
-            dst.y = y - static_cast<int>(hwcursor.HotY * cursor_scale);
-            dst.w = static_cast<int>(hwcursor.Surface->w * cursor_scale);
-            dst.h = static_cast<int>(hwcursor.Surface->h * cursor_scale);
-
-            if (Settings.Video.LargeCursor) {
-                SDL_BlitScaled(hwcursor.Surface, nullptr, windowSurface, &dst);
-            } else {
-                SDL_BlitSurface(hwcursor.Surface, nullptr, windowSurface, &dst);
+        bool metal_rendered = false;
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+        IPadPaletteCursor metal_cursor = {};
+        std::vector<IPadSelectionOverlay> metal_selections;
+        std::vector<IPadHDBuggyOverlay> metal_buggies;
+        std::vector<IPadHDInfantryOverlay> metal_infantry;
+        if (Settings.Video.ArtworkMode != 0 && !hd_buggies.empty()) {
+            const float scale_x = render_dst.w / static_cast<float>(surface->w);
+            const float scale_y = render_dst.h / static_cast<float>(surface->h);
+            std::vector<RegisteredHDBuggy> sorted_buggies = hd_buggies;
+            std::stable_sort(sorted_buggies.begin(), sorted_buggies.end(), [](const RegisteredHDBuggy& first,
+                                                                             const RegisteredHDBuggy& second) {
+                return first.body_y < second.body_y;
+            });
+            metal_buggies.reserve(sorted_buggies.size());
+            for (const RegisteredHDBuggy& registered : sorted_buggies) {
+                const auto destination = [&](int center_x, int center_y) {
+                    const int left = render_dst.x + static_cast<int>(std::lround((center_x - 12) * scale_x));
+                    const int top = render_dst.y + static_cast<int>(std::lround((center_y - 12) * scale_y));
+                    const int right = render_dst.x + static_cast<int>(std::lround((center_x + 12) * scale_x));
+                    const int bottom = render_dst.y + static_cast<int>(std::lround((center_y + 12) * scale_y));
+                    return IPadPaletteRect{left, top, std::max(1, right - left), std::max(1, bottom - top)};
+                };
+                IPadHDBuggyOverlay overlay;
+                overlay.body_destination = destination(registered.body_x, registered.body_y);
+                overlay.turret_destination = destination(registered.turret_x, registered.turret_y);
+                const int health_left = render_dst.x
+                                        + static_cast<int>(std::lround(registered.health_x * scale_x));
+                const int health_top = render_dst.y
+                                       + static_cast<int>(std::lround(registered.health_y * scale_y));
+                const int health_right = render_dst.x
+                                         + static_cast<int>(std::lround((registered.health_x
+                                                                         + registered.health_width) * scale_x));
+                const int health_bottom = render_dst.y
+                                          + static_cast<int>(std::lround((registered.health_y + 4) * scale_y));
+                overlay.health_destination = {health_left,
+                                              health_top,
+                                              std::max(1, health_right - health_left),
+                                              std::max(1, health_bottom - health_top)};
+                overlay.body_frame = registered.body_frame;
+                overlay.turret_frame = registered.turret_frame;
+                overlay.health_fill_width = std::max(
+                    0,
+                    static_cast<int>(std::lround(registered.health_fill_width * scale_x)));
+                overlay.palette_index = registered.palette_index;
+                overlay.health_palette_index = registered.health_palette_index;
+                overlay.health_visible = registered.health_visible;
+                overlay.atlas_kind = registered.atlas_kind;
+                metal_buggies.push_back(overlay);
             }
         }
+        if (Settings.Video.ArtworkMode != 0 && !hd_infantry.empty()) {
+            const float scale_x = render_dst.w / static_cast<float>(surface->w);
+            const float scale_y = render_dst.h / static_cast<float>(surface->h);
+            std::vector<RegisteredHDInfantry> sorted_infantry = hd_infantry;
+            std::stable_sort(sorted_infantry.begin(),
+                             sorted_infantry.end(),
+                             [](const RegisteredHDInfantry& first, const RegisteredHDInfantry& second) {
+                                 return first.center_y < second.center_y;
+                             });
+            metal_infantry.reserve(sorted_infantry.size());
+            for (const RegisteredHDInfantry& registered : sorted_infantry) {
+                const int left = render_dst.x
+                                 + static_cast<int>(std::lround((registered.center_x - 12) * scale_x));
+                const int top = render_dst.y
+                                + static_cast<int>(std::lround((registered.center_y - 12) * scale_y));
+                const int right = render_dst.x
+                                  + static_cast<int>(std::lround((registered.center_x + 12) * scale_x));
+                const int bottom = render_dst.y
+                                   + static_cast<int>(std::lround((registered.center_y + 12) * scale_y));
+                const int health_left = render_dst.x
+                                        + static_cast<int>(std::lround(registered.health_x * scale_x));
+                const int health_top = render_dst.y
+                                       + static_cast<int>(std::lround(registered.health_y * scale_y));
+                const int health_right = render_dst.x
+                                         + static_cast<int>(std::lround((registered.health_x
+                                                                         + registered.health_width) * scale_x));
+                const int health_bottom = render_dst.y
+                                          + static_cast<int>(std::lround((registered.health_y + 4) * scale_y));
+                IPadHDInfantryOverlay overlay;
+                overlay.destination = {left, top, std::max(1, right - left), std::max(1, bottom - top)};
+                overlay.health_destination = {health_left,
+                                              health_top,
+                                              std::max(1, health_right - health_left),
+                                              std::max(1, health_bottom - health_top)};
+                overlay.frame = registered.frame;
+                overlay.health_fill_width = std::max(
+                    0,
+                    static_cast<int>(std::lround(registered.health_fill_width * scale_x)));
+                overlay.palette_index = registered.palette_index;
+                overlay.health_palette_index = registered.health_palette_index;
+                overlay.health_visible = registered.health_visible;
+                metal_infantry.push_back(overlay);
+            }
+        }
+        if (Settings.Video.ArtworkMode != 0 && !selection_overlays.empty()) {
+            const float scale_x = render_dst.w / static_cast<float>(surface->w);
+            const float scale_y = render_dst.h / static_cast<float>(surface->h);
+            metal_selections.reserve(selection_overlays.size());
+            for (const RegisteredSelectionOverlay& registered : selection_overlays) {
+                const int left = render_dst.x + static_cast<int>(std::lround(registered.logical.x * scale_x));
+                const int top = render_dst.y + static_cast<int>(std::lround(registered.logical.y * scale_y));
+                const int right = render_dst.x
+                                  + static_cast<int>(std::lround((registered.logical.x
+                                                                  + registered.logical.width) * scale_x));
+                const int bottom = render_dst.y
+                                   + static_cast<int>(std::lround((registered.logical.y
+                                                                   + registered.logical.height) * scale_y));
+                IPadSelectionOverlay overlay = {{left,
+                                                 top,
+                                                 std::max(1, right - left),
+                                                 std::max(1, bottom - top)},
+                                                registered.palette_index};
+                metal_selections.push_back(overlay);
+            }
+        }
+        if (software_cursor) {
+            const float cursor_scale = Settings.Video.LargeCursor ? 1.5f : 1.0f;
+            const int game_x = cursor_x - static_cast<int>(hwcursor.HotX * cursor_scale);
+            const int game_y = cursor_y - static_cast<int>(hwcursor.HotY * cursor_scale);
+            metal_cursor.pixels = hwcursor.Surface->pixels;
+            metal_cursor.pitch = hwcursor.Surface->pitch;
+            metal_cursor.width = hwcursor.Surface->w;
+            metal_cursor.height = hwcursor.Surface->h;
+            metal_cursor.hotspot_x = hwcursor.HotX;
+            metal_cursor.hotspot_y = hwcursor.HotY;
+            metal_cursor.kind = cursor_kind;
+            metal_cursor.destination.x = render_dst.x + static_cast<int>(game_x * hwcursor.ScaleX);
+            metal_cursor.destination.y = render_dst.y + static_cast<int>(game_y * hwcursor.ScaleY);
+            metal_cursor.destination.width = std::max(1, static_cast<int>(hwcursor.Surface->w * cursor_scale * hwcursor.ScaleX));
+            metal_cursor.destination.height = std::max(1, static_cast<int>(hwcursor.Surface->h * cursor_scale * hwcursor.ScaleY));
+            metal_cursor.visible = true;
+            metal_cursor.pixels_changed = lastCursorGeneration != cursor_generation || !hadSoftwareCursor;
+        }
 
-        SDL_UpdateTexture(texture, NULL, windowSurface->pixels, windowSurface->pitch);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, texture, NULL, &render_dst);
-#ifdef IPADOS_PORT
+        if (paletteRenderer) {
+            const IPadPaletteRect viewport = {render_dst.x, render_dst.y, render_dst.w, render_dst.h};
+            metal_rendered = IPad_Palette_Render(paletteRenderer,
+                                                renderer,
+                                                surface->pixels,
+                                                surface->pitch,
+                                                indexed_pixels_changed,
+                                                indexed_update,
+                                                previous_palette,
+                                                lastPaletteGeneration != palette_generation,
+                                                Settings.Video.PresentationMode,
+                                                Settings.Video.ArtworkMode,
+                                                viewport,
+                                                metal_buggies.empty() ? nullptr : metal_buggies.data(),
+                                                static_cast<int>(metal_buggies.size()),
+                                                metal_infantry.empty() ? nullptr : metal_infantry.data(),
+                                                static_cast<int>(metal_infantry.size()),
+                                                metal_selections.empty() ? nullptr : metal_selections.data(),
+                                                static_cast<int>(metal_selections.size()),
+                                                metal_cursor);
+        }
+#endif
+
+        if (!metal_rendered) {
+            SDL_BlitSurface(surface, NULL, windowSurface, NULL);
+
+            if (Settings.Video.HardwareCursor) {
+                /*
+                ** Swap cursor before a frame is drawn. This reduces flickering when it's done only once per frame.
+                */
+                if (hwcursor.Pending) {
+                    SDL_SetCursor(hwcursor.Pending);
+
+                    if (hwcursor.Current) {
+                        SDL_FreeCursor(hwcursor.Current);
+                    }
+
+                    hwcursor.Current = hwcursor.Pending;
+                    hwcursor.Pending = nullptr;
+                }
+
+                /*
+                ** Update hardware cursor visibility.
+                */
+                SDL_ShowCursor(!Get_Mouse_State());
+            } else if (!Get_Mouse_State() && hwcursor.Surface != nullptr) {
+                /*
+                ** Draw software emulated cursor.
+                */
+                int x, y;
+                SDL_Rect dst;
+
+                Get_Video_Mouse(x, y);
+
+                const float cursor_scale = Settings.Video.LargeCursor ? 1.5f : 1.0f;
+                dst.x = x - static_cast<int>(hwcursor.HotX * cursor_scale);
+                dst.y = y - static_cast<int>(hwcursor.HotY * cursor_scale);
+                dst.w = static_cast<int>(hwcursor.Surface->w * cursor_scale);
+                dst.h = static_cast<int>(hwcursor.Surface->h * cursor_scale);
+
+                if (Settings.Video.LargeCursor) {
+                    SDL_BlitScaled(hwcursor.Surface, nullptr, windowSurface, &dst);
+                } else {
+                    SDL_BlitSurface(hwcursor.Surface, nullptr, windowSurface, &dst);
+                }
+            }
+
+            SDL_UpdateTexture(texture, NULL, windowSurface->pixels, windowSurface->pitch);
+            // Touch/Pencil feedback changes SDL's persistent renderer color. Set
+            // the letterbox clear color explicitly every frame so a previous
+            // yellow or blue feedback ring cannot tint newly exposed margins
+            // after a Stage Manager resize.
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderClear(renderer);
+            SDL_RenderCopy(renderer, texture, NULL, &render_dst);
+        }
+#ifdef TIBERIAN_DAWN_APPLE_PORT
         if (touch_feedback.active) {
             const float scale_x = render_dst.w / static_cast<float>(hwcursor.GameW);
             const float scale_y = render_dst.h / static_cast<float>(hwcursor.GameH);
@@ -1273,11 +1637,11 @@ public:
         const Uint64 present_started = SDL_GetPerformanceCounter();
 #endif
         SDL_RenderPresent(renderer);
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
         const Uint64 present_finished = SDL_GetPerformanceCounter();
         telemetry.present_ms += (present_finished - present_started) * 1000.0 / SDL_GetPerformanceFrequency();
         ++telemetry.presents;
-        ++telemetry.uploads;
+        if (!metal_rendered || indexed_pixels_changed) ++telemetry.uploads;
 
         const Uint32 input_timestamp = pending_input_timestamp.exchange(0, std::memory_order_acq_rel);
         if (input_timestamp != 0) {
@@ -1289,6 +1653,8 @@ public:
 
         lastPaletteGeneration = palette_generation;
         lastCursorGeneration = cursor_generation;
+        lastSelectionGeneration = selection_generation;
+        lastHDBuggyGeneration = hd_buggy_generation;
         lastTouchFeedbackGeneration = touch_feedback.generation;
         lastCursorX = cursor_x;
         lastCursorY = cursor_y;
@@ -1306,19 +1672,22 @@ private:
     SDL_Surface* windowSurface;
     SDL_Texture* texture;
     GBC_Enum flags;
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
     std::vector<Uint8> lastIndexedPixels;
     uint64_t lastPaletteGeneration;
     uint64_t lastCursorGeneration;
+    uint64_t lastSelectionGeneration;
+    uint64_t lastHDBuggyGeneration;
     uint64_t lastTouchFeedbackGeneration;
     int lastCursorX;
     int lastCursorY;
     bool hadSoftwareCursor;
     bool hasLastFrame;
+    IPadPaletteRenderer paletteRenderer;
 #endif
 };
 
-#ifdef IPADOS_PORT
+#ifdef TIBERIAN_DAWN_APPLE_PORT
 bool Video_Render_Frame()
 {
     if (frontSurface) {
@@ -1354,6 +1723,220 @@ void Video_Set_Touch_Feedback(int game_x, int game_y, bool pencil, bool released
     ++touch_feedback.generation;
     force_present = true;
     last_frame_idle = false;
+}
+
+void Video_Set_Selection_Overlay(const void* object,
+                                 int x,
+                                 int y,
+                                 int width,
+                                 int height,
+                                 unsigned char palette_index)
+{
+    if (!object || width <= 0 || height <= 0) return;
+    const IPadPaletteRect logical = {x, y, width, height};
+    for (RegisteredSelectionOverlay& overlay : selection_overlays) {
+        if (overlay.object != object) continue;
+        if (overlay.logical.x == logical.x && overlay.logical.y == logical.y
+            && overlay.logical.width == logical.width && overlay.logical.height == logical.height
+            && overlay.palette_index == palette_index) return;
+        overlay.logical = logical;
+        overlay.palette_index = palette_index;
+        ++selection_generation;
+        force_present = true;
+        return;
+    }
+    RegisteredSelectionOverlay overlay;
+    overlay.object = object;
+    overlay.logical = logical;
+    overlay.palette_index = palette_index;
+    selection_overlays.push_back(overlay);
+    ++selection_generation;
+    force_present = true;
+}
+
+void Video_Remove_Selection_Overlay(const void* object)
+{
+    const auto previous_size = selection_overlays.size();
+    selection_overlays.erase(std::remove_if(selection_overlays.begin(),
+                                            selection_overlays.end(),
+                                            [object](const RegisteredSelectionOverlay& overlay) {
+                                                return overlay.object == object;
+                                            }),
+                             selection_overlays.end());
+    if (selection_overlays.size() == previous_size) return;
+    ++selection_generation;
+    force_present = true;
+}
+
+void Video_Set_HD_Buggy_Component(const void* object,
+                                  int component,
+                                  int frame,
+                                  int center_x,
+                                  int center_y,
+                                  unsigned char palette_index)
+{
+    Video_Set_HD_Vehicle_Component(object, 0, component, frame, center_x, center_y, palette_index);
+}
+
+void Video_Set_HD_Vehicle_Component(const void* object,
+                                    int vehicle_kind,
+                                    int component,
+                                    int frame,
+                                    int center_x,
+                                    int center_y,
+                                    unsigned char palette_index)
+{
+    if (!object || vehicle_kind < 0 || vehicle_kind > 1 || component < 0 || component > 1
+        || frame < 0 || frame >= 64) return;
+    for (RegisteredHDBuggy& buggy : hd_buggies) {
+        if (buggy.object != object) continue;
+        int& saved_frame = component == 0 ? buggy.body_frame : buggy.turret_frame;
+        int& saved_x = component == 0 ? buggy.body_x : buggy.turret_x;
+        int& saved_y = component == 0 ? buggy.body_y : buggy.turret_y;
+        if (saved_frame == frame && saved_x == center_x && saved_y == center_y
+            && buggy.palette_index == palette_index && buggy.atlas_kind == vehicle_kind) return;
+        saved_frame = frame;
+        saved_x = center_x;
+        saved_y = center_y;
+        buggy.palette_index = palette_index;
+        buggy.atlas_kind = vehicle_kind;
+        ++hd_buggy_generation;
+        force_present = true;
+        return;
+    }
+
+    RegisteredHDBuggy buggy;
+    buggy.object = object;
+    buggy.palette_index = palette_index;
+    buggy.atlas_kind = vehicle_kind;
+    if (component == 0) {
+        buggy.body_frame = frame;
+        buggy.body_x = center_x;
+        buggy.body_y = center_y;
+    } else {
+        buggy.turret_frame = frame;
+        buggy.turret_x = center_x;
+        buggy.turret_y = center_y;
+    }
+    hd_buggies.push_back(buggy);
+    ++hd_buggy_generation;
+    force_present = true;
+}
+
+void Video_Set_HD_Infantry(const void* object,
+                           int frame,
+                           int center_x,
+                           int center_y,
+                           unsigned char palette_index)
+{
+    if (!object || frame < 0 || frame >= 80) return;
+    for (RegisteredHDInfantry& soldier : hd_infantry) {
+        if (soldier.object != object) continue;
+        if (soldier.frame == frame && soldier.center_x == center_x && soldier.center_y == center_y
+            && soldier.palette_index == palette_index) return;
+        soldier.frame = frame;
+        soldier.center_x = center_x;
+        soldier.center_y = center_y;
+        soldier.palette_index = palette_index;
+        ++hd_buggy_generation;
+        force_present = true;
+        return;
+    }
+    RegisteredHDInfantry soldier;
+    soldier.object = object;
+    soldier.frame = frame;
+    soldier.center_x = center_x;
+    soldier.center_y = center_y;
+    soldier.palette_index = palette_index;
+    hd_infantry.push_back(soldier);
+    ++hd_buggy_generation;
+    force_present = true;
+}
+
+void Video_Remove_HD_Artwork(const void* object)
+{
+    const auto previous_size = hd_buggies.size();
+    hd_buggies.erase(std::remove_if(hd_buggies.begin(),
+                                    hd_buggies.end(),
+                                    [object](const RegisteredHDBuggy& buggy) {
+                                        return buggy.object == object;
+                                    }),
+                     hd_buggies.end());
+    const auto previous_infantry_size = hd_infantry.size();
+    hd_infantry.erase(std::remove_if(hd_infantry.begin(),
+                                     hd_infantry.end(),
+                                     [object](const RegisteredHDInfantry& soldier) {
+                                         return soldier.object == object;
+                                     }),
+                      hd_infantry.end());
+    if (hd_buggies.size() == previous_size && hd_infantry.size() == previous_infantry_size) return;
+    ++hd_buggy_generation;
+    force_present = true;
+}
+
+void Video_Set_HD_Health(const void* object,
+                         bool visible,
+                         int x,
+                         int y,
+                         int width,
+                         int fill_width,
+                         unsigned char palette_index)
+{
+    if (!object) return;
+    for (RegisteredHDBuggy& buggy : hd_buggies) {
+        if (buggy.object != object) continue;
+        if (buggy.health_visible == visible && (!visible
+                                                || (buggy.health_x == x && buggy.health_y == y
+                                                    && buggy.health_width == width
+                                                    && buggy.health_fill_width == fill_width
+                                                    && buggy.health_palette_index == palette_index))) return;
+        buggy.health_visible = visible;
+        buggy.health_x = x;
+        buggy.health_y = y;
+        buggy.health_width = width;
+        buggy.health_fill_width = fill_width;
+        buggy.health_palette_index = palette_index;
+        ++hd_buggy_generation;
+        force_present = true;
+        return;
+    }
+    for (RegisteredHDInfantry& soldier : hd_infantry) {
+        if (soldier.object != object) continue;
+        if (soldier.health_visible == visible && (!visible
+                                                  || (soldier.health_x == x && soldier.health_y == y
+                                                      && soldier.health_width == width
+                                                      && soldier.health_fill_width == fill_width
+                                                      && soldier.health_palette_index == palette_index))) return;
+        soldier.health_visible = visible;
+        soldier.health_x = x;
+        soldier.health_y = y;
+        soldier.health_width = width;
+        soldier.health_fill_width = fill_width;
+        soldier.health_palette_index = palette_index;
+        ++hd_buggy_generation;
+        force_present = true;
+        return;
+    }
+}
+
+bool Video_Uses_HD_Buggy_Artwork()
+{
+    return Settings.Video.ArtworkMode != 0 && hd_buggy_renderer_available;
+}
+
+bool Video_Uses_HD_Humvee_Artwork()
+{
+    return Settings.Video.ArtworkMode != 0 && hd_humvee_renderer_available;
+}
+
+bool Video_Uses_HD_Minigunner_Artwork()
+{
+    return Settings.Video.ArtworkMode != 0 && hd_minigunner_renderer_available;
+}
+
+bool Video_Uses_Modern_Artwork()
+{
+    return Settings.Video.ArtworkMode != 0;
 }
 
 void Set_IPadOS_Text_Input_Rect(int game_x, int game_y, int game_w, int game_h)

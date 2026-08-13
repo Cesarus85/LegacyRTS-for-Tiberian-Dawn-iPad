@@ -1,6 +1,10 @@
 # Contributing
 
-Thank you for helping improve Tiberian Dawn for iPad.
+The iPadOS and macOS apps must remain at feature parity wherever Apple APIs
+allow it. Read [docs/PLATFORM_PARITY.md](docs/PLATFORM_PARITY.md) before changing
+shared gameplay, graphics, audio, menus, localization, saves, or resources.
+
+Thank you for helping improve Tiberian Dawn for iPad and macOS.
 
 ## Before submitting a change
 
@@ -9,8 +13,8 @@ Thank you for helping improve Tiberian Dawn for iPad.
    disc images, extracted assets, signing certificates, provisioning profiles,
    Apple team IDs, or credentials.
 3. Preserve existing copyright headers and mark substantial modifications.
-4. Build the physical-iPad target for iPad-specific work. Run the host tests for
-   shared engine changes.
+4. Build the physical-iPad target for iPad-specific work and the Universal 2
+   package for macOS work. Run the host tests for shared engine changes.
 5. Describe what changed, how it was tested, and any remaining device-specific
    validation.
 

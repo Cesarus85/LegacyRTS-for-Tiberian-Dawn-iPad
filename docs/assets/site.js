@@ -26,7 +26,7 @@
       button.setAttribute('aria-pressed', String(button.dataset.language === language));
     });
     try {
-      localStorage.setItem('tiberian-dawn-for-ipad-language', language);
+      localStorage.setItem('tiberian-dawn-apple-language', language);
     } catch (_) {
       // The language switch works even when storage is unavailable.
     }
@@ -38,7 +38,7 @@
 
   let savedLanguage = null;
   try {
-    savedLanguage = localStorage.getItem('tiberian-dawn-for-ipad-language');
+    savedLanguage = localStorage.getItem('tiberian-dawn-apple-language');
   } catch (_) {}
   const preferredLanguage = navigator.language.toLowerCase().startsWith('de') ? 'de' : 'en';
   setLanguage(savedLanguage === 'de' || savedLanguage === 'en' ? savedLanguage : preferredLanguage);

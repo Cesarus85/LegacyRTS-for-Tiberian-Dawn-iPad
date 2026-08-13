@@ -2,7 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-project_file="$repository_root/build/ipados-device/TiberianDawnForiPad.xcodeproj"
+project_file="$repository_root/build/ipados-device/TiberianDawnApple.xcodeproj"
 sdl_directory="$repository_root/third_party/SDL2"
 sdl_commit="5d249570393f7a37e037abf22cd6012a4cc56a71"
 temporary_checkout=""

@@ -57,7 +57,7 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #include "common/settings.h"
 #endif
 #include "options.h"
@@ -887,7 +887,7 @@ void OptionsClass::Save_Settings(void)
     /*
     **	Write the INI data out to a file.
     */
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     Settings.Save(ini);
 #endif
     ini.Save(file);

@@ -1,4 +1,7 @@
 /build*
+!/Build Tiberian Dawn for macOS.command
+/dist/
+/com.apple.DeveloperTools/
 /CMakeUserPresets.json
 /.cache
 /.vscode

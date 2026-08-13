@@ -35,6 +35,13 @@
 
 #include "function.h"
 #include "common/framelimit.h"
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#ifdef IPADOS_PORT
+#include "platform/apple/ipados_platform.h"
+#else
+#include "platform/apple/macos_platform.h"
+#endif
+#endif
 
 /*****************************
 **	Function prototypes
@@ -511,6 +518,12 @@ int Main_Menu(unsigned int timeout)
         BUTTON_MULTI,
         BUTTON_INTRO,
         BUTTON_EXIT,
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+        // Keep the legacy menu return values stable: the iPad-only save manager
+        // gets an ID after the original entries, even though it is displayed
+        // before Multiplayer.
+        BUTTON_SAVES,
+#endif
     };
 
 #ifdef NEWMENU
@@ -521,12 +534,24 @@ int Main_Menu(unsigned int timeout)
     int curbutton;
 #ifdef NEWMENU
 #ifdef BONUS_MISSIONS
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    TextButtonClass* buttons[9];
+#else
+    TextButtonClass* buttons[8];
+#endif
+#else
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     TextButtonClass* buttons[8];
 #else
     TextButtonClass* buttons[7];
+#endif
 #endif // BONUS_MISSIONS
 #else
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    TextButtonClass* buttons[6];
+#else
     TextButtonClass* buttons[5];
+#endif
 #endif
     //	unsigned int starttime;
 
@@ -599,6 +624,27 @@ int Main_Menu(unsigned int timeout)
 
 #endif
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#ifdef NEWMENU
+    TextButtonClass savebtn(BUTTON_SAVES,
+                            TiberianDawn_LocalizedText("main_saves"),
+                            TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
+                            D_MULTI_X,
+                            starty,
+                            D_MULTI_W,
+                            D_MULTI_H);
+    starty += ystep;
+#else
+    TextButtonClass savebtn(BUTTON_SAVES,
+                            TiberianDawn_LocalizedText("main_saves"),
+                            TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
+                            D_MULTI_X,
+                            (D_LOAD_Y + D_MULTI_Y) / 2,
+                            D_MULTI_W,
+                            D_MULTI_H);
+#endif
+#endif
+
 #ifdef DEMO
     TextButtonClass multibtn(BUTTON_MULTI,
                              TXT_ORDER_INFO,
@@ -610,9 +656,9 @@ int Main_Menu(unsigned int timeout)
 #else
 
 #ifdef NEWMENU
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     TextButtonClass multibtn(BUTTON_MULTI,
-                             "Multiplayer: nicht verfuegbar",
+                             TiberianDawn_LocalizedText("main_multiplayer_unavailable"),
                              TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
                              D_MULTI_X,
                              starty,
@@ -634,9 +680,9 @@ int Main_Menu(unsigned int timeout)
     //	D_INTERNET_X, starty, D_INTERNET_W, D_INTERNET_H);
     // starty += ystep;
 #else
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     TextButtonClass multibtn(BUTTON_MULTI,
-                             "Multiplayer: nicht verfuegbar",
+                             TiberianDawn_LocalizedText("main_multiplayer_unavailable"),
                              TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
                              D_MULTI_X,
                              D_MULTI_Y,
@@ -652,6 +698,10 @@ int Main_Menu(unsigned int timeout)
                              D_MULTI_H);
 #endif
 #endif
+#endif
+
+#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && !defined(DEMO)
+    multibtn.Disable();
 #endif
 
 #ifdef NEWMENU
@@ -740,12 +790,10 @@ int Main_Menu(unsigned int timeout)
 #endif // BONUS_MISSIONS
 
     loadbtn.Add_Tail(*commands);
-    multibtn.Add_Tail(*commands);
-#ifdef IPADOS_PORT
-    // Networking stays intentionally unavailable until a native transport and
-    // an interoperability test matrix exist for the iPad release.
-    multibtn.Disable();
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    savebtn.Add_Tail(*commands);
 #endif
+    multibtn.Add_Tail(*commands);
     introbtn.Add_Tail(*commands);
     exitbtn.Add_Tail(*commands);
 
@@ -766,16 +814,31 @@ int Main_Menu(unsigned int timeout)
     buttons[butt++] = &bonusbtn;
 #endif // BONUS_MISSIONS
     buttons[butt++] = &loadbtn;
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    buttons[butt++] = &savebtn;
+#endif
     buttons[butt++] = &multibtn;
     buttons[butt++] = &introbtn;
     buttons[butt++] = &exitbtn;
+    const int first_menu_button = expansions ? 0 : 1;
+    const int last_menu_button = butt - 1;
 #else
     curbutton = 0;
     buttons[0] = &startbtn;
     buttons[1] = &loadbtn;
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    buttons[2] = &savebtn;
+    buttons[3] = &multibtn;
+    buttons[4] = &introbtn;
+    buttons[5] = &exitbtn;
+    const int last_menu_button = 5;
+#else
     buttons[2] = &multibtn;
     buttons[3] = &introbtn;
     buttons[4] = &exitbtn;
+    const int last_menu_button = 4;
+#endif
+    const int first_menu_button = 0;
 #endif
     buttons[curbutton]->Turn_On();
 
@@ -900,13 +963,26 @@ int Main_Menu(unsigned int timeout)
             process = false;
             break;
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+        case (BUTTON_SAVES | KN_BUTTON):
+            TiberianDawn_ManageSaveGames();
+            Keyboard->Clear();
+            display = true;
+            break;
+#endif
+
         case (BUTTON_MULTI | KN_BUTTON):
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+            // Reserved for a future iPad multiplayer implementation.
+            break;
+#else
             retval = (input & 0x7FFF) - BUTTON_EXPAND;
 #ifdef DEMO
             retval += 1;
 #endif // DEMO
             process = false;
             break;
+#endif
 
         case (BUTTON_INTRO | KN_BUTTON):
             retval = (input & 0x7FFF) - BUTTON_EXPAND;
@@ -928,19 +1004,15 @@ int Main_Menu(unsigned int timeout)
             buttons[curbutton]->Turn_Off();
             buttons[curbutton]->Flag_To_Redraw();
             curbutton--;
-#ifdef NEWMENU
-            if (expansions) {
-                if (curbutton < 0) {
-                    curbutton = 5;
-                }
-            } else {
-                if (curbutton < 1) {
-                    curbutton = 5;
-                }
+            if (curbutton < first_menu_button) {
+                curbutton = last_menu_button;
             }
-#else
-            if (curbutton < 0) {
-                curbutton = 4;
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+            if (buttons[curbutton] == &multibtn) {
+                curbutton--;
+                if (curbutton < first_menu_button) {
+                    curbutton = last_menu_button;
+                }
             }
 #endif
             buttons[curbutton]->Turn_On();
@@ -951,17 +1023,15 @@ int Main_Menu(unsigned int timeout)
             buttons[curbutton]->Turn_Off();
             buttons[curbutton]->Flag_To_Redraw();
             curbutton++;
-#ifdef NEWMENU
-            if (curbutton > 5) {
-                if (expansions) {
-                    curbutton = 0;
-                } else {
-                    curbutton = 1;
-                }
+            if (curbutton > last_menu_button) {
+                curbutton = first_menu_button;
             }
-#else
-            if (curbutton > 4) {
-                curbutton = 0;
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+            if (buttons[curbutton] == &multibtn) {
+                curbutton++;
+                if (curbutton > last_menu_button) {
+                    curbutton = first_menu_button;
+                }
             }
 #endif
             buttons[curbutton]->Turn_On();
@@ -969,14 +1039,26 @@ int Main_Menu(unsigned int timeout)
             break;
 
         case KN_RETURN:
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+            if (buttons[curbutton] == &savebtn) {
+                TiberianDawn_ManageSaveGames();
+                Keyboard->Clear();
+                display = true;
+                break;
+            }
             if (buttons[curbutton] == &multibtn) {
                 break;
             }
 #endif
             buttons[curbutton]->IsPressed = true;
             buttons[curbutton]->Draw_Me(true);
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+            // The save manager is visually inserted before the remaining
+            // legacy entries but is not part of Select_Game's return enum.
+            retval = curbutton - (buttons[curbutton] == &introbtn || buttons[curbutton] == &exitbtn ? 1 : 0);
+#else
             retval = curbutton;
+#endif
             process = false;
             break;
 

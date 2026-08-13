@@ -13,13 +13,13 @@
 
 extern WWMouseClass* WWMouse;
 
-#if defined(NEW_VIDEO_BUILD) && !defined(IPADOS_PORT)
+#if defined(NEW_VIDEO_BUILD) && !defined(IPADOS_PORT) && !defined(MACOS_PORT)
 void Video_Render_Frame();
 #endif
 
 void Frame_Limiter(FrameLimitFlags flags)
 {
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     using Clock = std::chrono::steady_clock;
     static Clock::time_point next_frame = Clock::now();
     static int previous_limit = 0;

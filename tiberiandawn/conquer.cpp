@@ -60,6 +60,9 @@
 
 #include "function.h"
 #ifdef IPADOS_PORT
+#include "platform/apple/ipados_platform.h"
+#endif
+#ifdef IPADOS_PORT
 #include "ipados_lifecycle.h"
 #include "common/ipados_touch.h"
 #include <SDL.h>
@@ -1350,7 +1353,11 @@ char const* Language_Name(char const* basename)
     if (!basename)
         return (NULL);
 
+#ifdef IPADOS_PORT
+    sprintf(_fullname, "%s.%s", basename, TiberianDawn_ClassicLanguageExtension());
+#else
     sprintf(_fullname, "%s.ENG", basename);
+#endif
     return (_fullname);
 }
 
