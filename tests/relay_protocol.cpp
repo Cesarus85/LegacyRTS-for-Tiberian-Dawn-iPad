@@ -46,5 +46,12 @@ int main()
     oversized.payload.resize(MaximumPayloadSize + 1);
     const bool oversized_encoded = Encode(oversized, wire);
     assert(!oversized_encoded);
+
+    const std::uint8_t directed_node[6] = {0x05, 0x06, 0x07, 0x08, 0, 0};
+    assert(PeerTargetFromNode(directed_node, false) == 0x05060708);
+    assert(PeerTargetFromNode(directed_node, true) == 0);
+    const std::uint8_t classic_broadcast_node[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    assert(PeerTargetFromNode(classic_broadcast_node, false) == 0);
+    assert(PeerTargetFromNode(nullptr, false) == 0);
     return 0;
 }

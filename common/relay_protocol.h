@@ -39,6 +39,7 @@ enum class DecodeResult
 bool Encode(const Message& message, std::vector<std::uint8_t>& output);
 DecodeResult Decode(const std::uint8_t* data, std::size_t size, Message& output);
 const char* DecodeResultText(DecodeResult result);
+std::uint32_t PeerTargetFromNode(const std::uint8_t node[6], bool marked_broadcast);
 } // namespace TiberianDawnRelay
 
 #endif
