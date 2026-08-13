@@ -19,6 +19,7 @@ legally entitled to use.
 
 [Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad-and-macOS/) · [iPad build guide](README-iPadOS.md) ·
 [macOS build guide](README-macOS.md) · [Apple-platform parity](docs/PLATFORM_PARITY.md) ·
+[Multiplayer plan](docs/MULTIPLAYER-CONCEPT.md) · [Vision Pro plan](docs/VISIONOS-CONCEPT.md) ·
 [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
 ## Gameplay on iPad
@@ -80,6 +81,14 @@ implemented. The Universal 2 macOS package has been tested from a clean archive
 through local ISO import, videos, menus, mouse input, campaign launch, and a live
 mission. Both remain source-built projects rather than App Store distributions.
 
+The next two major platform projects are now specified rather than merely
+listed: modern cross-platform multiplayer begins with deterministic loopback
+and Apple LAN play before private Internet rooms, while Apple Vision Pro begins
+with `Designed for iPad` compatibility before a native visionOS command window
+and optional spatial presentation. See the [multiplayer architecture](docs/MULTIPLAYER-CONCEPT.md)
+and [Vision Pro concept](docs/VISIONOS-CONCEPT.md) for scope, milestones,
+privacy, failure policy, and release gates.
+
 ## Open in Xcode and run on a physical iPad
 
 Requirements:
@@ -140,8 +149,12 @@ backend as the iPad build. Platform-only differences are documented in the
 
 ## Known limitations
 
-- Multiplayer is work in progress for a later development stage; networking is
-  disabled in the current build.
+- Multiplayer is designed but not implemented; networking remains disabled
+  until the LAN acceptance gate in the [implementation plan](docs/MULTIPLAYER-CONCEPT.md).
+- A native visionOS target is planned but not yet enabled. The staged
+  [Vision Pro plan](docs/VISIONOS-CONCEPT.md) starts with compatibility testing
+  of the existing iPad app and requires physical Vision Pro acceptance before
+  claiming a native port.
 - Red Alert is present in the upstream source tree but is not a supported Apple
   app target in this project.
 - External-display behavior is not release-tested.

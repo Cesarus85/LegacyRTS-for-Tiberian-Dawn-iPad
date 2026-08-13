@@ -22,3 +22,12 @@ the same functional level whenever the operating systems permit it.
   and release candidates on a physical iPad before declaring work complete.
 - Keep shared Apple resources below `resources/apple`; do not create divergent
   iPad and Mac copies of the same artwork.
+- Treat multiplayer as one protocol and simulation feature across Apple
+  targets. Platform code may implement discovery, permissions, and lifecycle,
+  but must not create incompatible iPad, Mac, or visionOS game rules or wire
+  formats. Follow `docs/MULTIPLAYER-CONCEPT.md` and keep release presets offline
+  until its acceptance gate is met.
+- Treat `Designed for iPad` on Apple Vision Pro as a compatibility target, not
+  proof of a native port. When `VISIONOS_PORT` is introduced, shared features
+  must include it by default and the native compile/device gates in
+  `docs/VISIONOS-CONCEPT.md` become part of release acceptance.
