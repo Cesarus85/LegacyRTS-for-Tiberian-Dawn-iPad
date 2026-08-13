@@ -24,6 +24,16 @@ grep -q '#if defined(IPADOS_PORT) || defined(MACOS_PORT)' tiberiandawn/visudlg.c
 grep -q '#if defined(IPADOS_PORT) || defined(MACOS_PORT)' tiberiandawn/gamedlg.cpp
 grep -q '"OPENAL": "OFF"' CMakePresets.json
 
+# Both Apple bundles must derive their public and build versions from the same
+# top-level metadata. This prevents a release from showing different versions
+# in Finder and iPad Settings even though it was built from one commit.
+grep -Eq '^project\(TiberianDawnApple VERSION [0-9]+\.[0-9]+\.[0-9]+ LANGUAGES C CXX\)$' CMakeLists.txt
+grep -Eq '^set\(TIBERIAN_DAWN_BUILD_VERSION "[0-9]+"\)$' CMakeLists.txt
+grep -q 'MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"' tiberiandawn/CMakeLists.txt
+grep -q 'MACOSX_BUNDLE_BUNDLE_VERSION "${TIBERIAN_DAWN_BUILD_VERSION}"' tiberiandawn/CMakeLists.txt
+grep -q '<string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>' platform/apple/Info-iPadOS.plist.in
+grep -q '<string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>' platform/apple/Info-macOS.plist.in
+
 if grep -R -n -E 'LegacyRTS|LEGACY_RTS' \
     --exclude=check-apple-parity.sh \
     --exclude-dir=.git --exclude-dir=build --exclude-dir=dist \

@@ -252,8 +252,8 @@ if(BUILD_VANILLATD)
             MACOSX_BUNDLE True
             MACOSX_BUNDLE_GUI_IDENTIFIER org.tiberiandawn.macos
             MACOSX_BUNDLE_BUNDLE_NAME "Tiberian Dawn"
-            MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${TIBERIAN_DAWN_BUILD_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
             MACOSX_BUNDLE_COPYRIGHT "Based on code released under GPLv3 by EA"
             MACOSX_BUNDLE_ICON_FILE "vanillatd_icon.icns"
         )

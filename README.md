@@ -1,5 +1,8 @@
 # Tiberian Dawn for iPad and macOS
 
+Current release: **0.2.2** (Apple build **202**). The macOS and iPadOS bundles
+share these values from the same CMake project metadata.
+
 > **EA has not endorsed and does not support this product.**
 
 **Command & Conquer: Tiberian Dawn (1995), running natively on iPadOS and
