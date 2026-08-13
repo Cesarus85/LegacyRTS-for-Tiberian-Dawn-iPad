@@ -17,7 +17,7 @@ if(NOT DEFINED CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Choose the type of build, options are: Debug Release RelWithDebInfo" FORCE)
 endif()
 
-project(TiberianDawnForiPad C CXX)
+project(TiberianDawnApple C CXX)
 
 option(BUILD_REMASTERTD "Build Tiberian Dawn remaster dll." OFF)
 option(BUILD_REMASTERRA "Build Red Alert remaster dll." OFF)
@@ -52,6 +52,13 @@ set(IPADOS_DEVELOPMENT_TEAM "" CACHE STRING "Apple development team used to sign
 
 if(MACOS_PORT AND (NOT APPLE OR CMAKE_SYSTEM_NAME STREQUAL "iOS"))
     message(FATAL_ERROR "MACOS_PORT is available only for native macOS builds.")
+endif()
+
+# Both native Apple targets use the same AVAudioEngine backend. Keeping this
+# decision here prevents a platform preset from silently falling back to the
+# legacy OpenAL path.
+if(IPADOS_PORT OR MACOS_PORT)
+    set(OPENAL OFF CACHE BOOL "OpenAL is replaced by AVAudioEngine on Apple ports" FORCE)
 endif()
 
 if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Windows")

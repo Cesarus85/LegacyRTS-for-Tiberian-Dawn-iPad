@@ -120,7 +120,13 @@ set(COMMONV_SRC
     app_lifecycle.cpp
     framelimit.cpp
     gbuffer.cpp
+    hd_asset_pack.cpp
     interpal.cpp
+    ipados_layout.cpp
+    install_transaction.cpp
+    iso9660.cpp
+    recovery_transaction.cpp
+    savegame_transfer.cpp
     unvqbuff.cpp
     vqaconfig.cpp
     vqadrawer.cpp
@@ -132,7 +138,16 @@ set(COMMONV_SRC
     wwmouse.cpp
 )
 
-if(DSOUND)
+if(IPADOS_PORT OR MACOS_PORT)
+    list(APPEND COMMONV_SRC
+        audio_queue_state.cpp
+        ipados_audio_engine.mm
+        ipados_palette_renderer.mm
+        soundio_common.cpp
+        soundio_avengine.mm
+        vqaaudio_avengine.mm
+    )
+elseif(DSOUND)
     list(APPEND COMMONV_SRC soundio.cpp vqaaudio_dsound.cpp)
     list(APPEND VANILLA_LIBS dsound)
 elseif(OPENAL)
@@ -210,6 +225,10 @@ if(BUILD_VANILLATD OR BUILD_VANILLARA OR BUILD_TESTS)
     endif()
     if(OPENAL)
         target_compile_definitions(commonv PUBLIC OPENAL_BUILD)
+    endif()
+    if(IPADOS_PORT OR MACOS_PORT)
+        target_compile_definitions(commonv PUBLIC AVAUDIOENGINE_BUILD)
+        set_target_properties(commonv PROPERTIES XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES")
     endif()
     if(SDL2)
         target_compile_definitions(commonv PUBLIC SDL_BUILD SDL2_BUILD NEW_VIDEO_BUILD)

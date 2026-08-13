@@ -2,8 +2,9 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+developer_dir=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 build_root="$repository_root/build/macos-universal"
-project_file="$build_root/TiberianDawnForiPad.xcodeproj"
+project_file="$build_root/TiberianDawnApple.xcodeproj"
 source_app="$build_root/Release/Tiberian Dawn.app"
 dist_root="$repository_root/dist"
 archive="$dist_root/Tiberian-Dawn-macOS-universal.zip"
@@ -28,7 +29,12 @@ fail()
 
 [ "$(uname -s)" = "Darwin" ] || fail "The macOS app can be packaged only on a Mac."
 command -v cmake >/dev/null 2>&1 || fail "CMake 3.25 or newer is required."
+[ -x "$developer_dir/usr/bin/xcodebuild" ] || fail "Install Xcode in /Applications or set DEVELOPER_DIR."
 [ -f "$repository_root/third_party/SDL2/CMakeLists.txt" ] || fail "Initialize the pinned SDL2 submodule first."
+
+# Use the full Xcode toolchain for this process without changing the user's
+# global xcode-select setting or requiring administrator access.
+export DEVELOPER_DIR="$developer_dir"
 
 printf 'Configuring the universal macOS app...\n'
 cmake --preset macos-universal -S "$repository_root"

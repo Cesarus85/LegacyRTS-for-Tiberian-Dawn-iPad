@@ -46,6 +46,15 @@ The game opens in a resizable Retina-aware window so the pointer remains easy
 to control. The green window button can enlarge the window; Option-Return
 toggles the engine's full-screen mode.
 
+The macOS app shares the iPad enhancement layer: Metal rendering, adaptive
+16:10 scaling, sharp/pixel-perfect/classic presentation modes, optional modern
+cursor and unit artwork, large-cursor/high-contrast options, UI scaling,
+German/English menus, controller input, and AVAudioEngine playback. Open
+**Options > Visual Controls** to change presentation and artwork modes. Open
+**Options > Game Controls** for language, controller, battery, and save access.
+See the [platform-parity policy](docs/PLATFORM_PARITY.md) for the deliberately
+native iPad/macOS differences.
+
 Immutable game data is stored below:
 
 ```text

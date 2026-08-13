@@ -37,10 +37,37 @@
 #include "function.h"
 #include "visudlg.h"
 #include "common/framelimit.h"
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #include "common/settings.h"
 #include "common/video.h"
+#ifdef IPADOS_PORT
+#include "platform/apple/ipados_platform.h"
+#else
+#include "platform/apple/macos_platform.h"
+#endif
 #include <cstdio>
+#endif
+
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+namespace
+{
+const char* Presentation_Mode_Text(int mode)
+{
+    switch (mode) {
+    case 1:
+        return TiberianDawn_LocalizedText("visual_mode_pixel");
+    case 2:
+        return TiberianDawn_LocalizedText("visual_mode_classic");
+    default:
+        return TiberianDawn_LocalizedText("visual_mode_sharp");
+    }
+}
+
+const char* Artwork_Mode_Text(int mode)
+{
+    return TiberianDawn_LocalizedText(mode == 1 ? "visual_artwork_modern" : "visual_artwork_original");
+}
+}
 #endif
 
 int VisualControlsClass::Init(void)
@@ -48,7 +75,7 @@ int VisualControlsClass::Init(void)
     int factor = (SeenBuff.Get_Width() == 320) ? 1 : 2;
     Option_Width = 216 * factor;
     Option_Height =
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
         160 * factor;
 #else
         122 * factor;
@@ -64,7 +91,7 @@ int VisualControlsClass::Init(void)
     Slider_Y_Spacing = 11 * factor;
     Button_X = Option_X + (63 * factor);
     Button_Y = Option_Y + (
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
         140
 #else
         102
@@ -115,19 +142,28 @@ void VisualControlsClass::Process(void)
 
     TextButtonClass resetbtn(BUTTON_RESET, TXT_RESET_MENU, TPF_6PT_GRAD | TPF_NOSHADOW, 0, Button_Y);
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     char presentation_text[48];
+    char artwork_text[48];
     char scale_text[48];
     char accessibility_text[48];
     std::snprintf(presentation_text,
                   sizeof(presentation_text),
-                  "Bild: %s",
-                  Settings.Video.PresentationMode ? "Pixelgenau" : "Voll");
-    std::snprintf(scale_text, sizeof(scale_text), "Touch UI: %d%%", Settings.Video.TouchUIScale);
+                  TiberianDawn_LocalizedText("visual_image_format"),
+                  Presentation_Mode_Text(Settings.Video.PresentationMode));
+    std::snprintf(artwork_text,
+                  sizeof(artwork_text),
+                  TiberianDawn_LocalizedText("visual_artwork_format"),
+                  Artwork_Mode_Text(Settings.Video.ArtworkMode));
+    std::snprintf(scale_text,
+                  sizeof(scale_text),
+                  TiberianDawn_LocalizedText("visual_ui_format"),
+                  Settings.Video.TouchUIScale);
     std::snprintf(accessibility_text,
                   sizeof(accessibility_text),
-                  "Lesbarkeit: %s",
-                  Settings.Video.HighContrast ? "Hoch" : "Normal");
+                  TiberianDawn_LocalizedText("visual_readability_format"),
+                  TiberianDawn_LocalizedText(Settings.Video.HighContrast ? "visual_readability_high"
+                                                                      : "visual_readability_normal"));
     TextButtonClass presentationbtn(BUTTON_IPAD_PRESENTATION,
                                     presentation_text,
                                     TPF_6PT_GRAD | TPF_NOSHADOW,
@@ -142,12 +178,19 @@ void VisualControlsClass::Process(void)
                              Option_Y + 78 * factor,
                              88 * factor,
                              11 * factor);
+    TextButtonClass artworkbtn(BUTTON_IPAD_ARTWORK,
+                               artwork_text,
+                               TPF_6PT_GRAD | TPF_NOSHADOW,
+                               Option_X + 15 * factor,
+                               Option_Y + 94 * factor,
+                               88 * factor,
+                               11 * factor);
     TextButtonClass accessibilitybtn(BUTTON_IPAD_ACCESSIBILITY,
                                      accessibility_text,
                                      TPF_6PT_GRAD | TPF_NOSHADOW,
-                                     Option_X + 50 * factor,
+                                     Option_X + 113 * factor,
                                      Option_Y + 94 * factor,
-                                     116 * factor,
+                                     88 * factor,
                                      11 * factor);
 #endif
 
@@ -158,9 +201,10 @@ void VisualControlsClass::Process(void)
     resetbtn.X = Option_X + (15 * factor);
 
     resetbtn.Add_Tail(optionsbtn);
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     presentationbtn.Add_Tail(optionsbtn);
     scalebtn.Add_Tail(optionsbtn);
+    artworkbtn.Add_Tail(optionsbtn);
     accessibilitybtn.Add_Tail(optionsbtn);
 #endif
 
@@ -315,13 +359,13 @@ void VisualControlsClass::Process(void)
             Options.Set_Tint(tint.Get_Value());
             break;
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
         case (BUTTON_IPAD_PRESENTATION | KN_BUTTON):
-            Settings.Video.PresentationMode = Settings.Video.PresentationMode ? 0 : 1;
+            Settings.Video.PresentationMode = (Settings.Video.PresentationMode + 1) % 3;
             std::snprintf(presentation_text,
                           sizeof(presentation_text),
-                          "Bild: %s",
-                          Settings.Video.PresentationMode ? "Pixelgenau" : "Voll");
+                          TiberianDawn_LocalizedText("visual_image_format"),
+                          Presentation_Mode_Text(Settings.Video.PresentationMode));
             presentationbtn.Set_Text(presentation_text, false);
             presentationbtn.Flag_To_Redraw();
             Refresh_Video_Layout();
@@ -330,9 +374,23 @@ void VisualControlsClass::Process(void)
         case (BUTTON_IPAD_UI_SCALE | KN_BUTTON):
             Settings.Video.TouchUIScale = Settings.Video.TouchUIScale < 125 ? 125
                                               : (Settings.Video.TouchUIScale < 150 ? 150 : 100);
-            std::snprintf(scale_text, sizeof(scale_text), "Touch UI: %d%%", Settings.Video.TouchUIScale);
+            std::snprintf(scale_text,
+                          sizeof(scale_text),
+                          TiberianDawn_LocalizedText("visual_ui_format"),
+                          Settings.Video.TouchUIScale);
             scalebtn.Set_Text(scale_text, false);
             scalebtn.Flag_To_Redraw();
+            break;
+
+        case (BUTTON_IPAD_ARTWORK | KN_BUTTON):
+            Settings.Video.ArtworkMode = Settings.Video.ArtworkMode == 0 ? 1 : 0;
+            std::snprintf(artwork_text,
+                          sizeof(artwork_text),
+                          TiberianDawn_LocalizedText("visual_artwork_format"),
+                          Artwork_Mode_Text(Settings.Video.ArtworkMode));
+            artworkbtn.Set_Text(artwork_text, false);
+            artworkbtn.Flag_To_Redraw();
+            Refresh_Video_Layout();
             break;
 
         case (BUTTON_IPAD_ACCESSIBILITY | KN_BUTTON):
@@ -340,8 +398,9 @@ void VisualControlsClass::Process(void)
             Settings.Video.LargeCursor = Settings.Video.HighContrast;
             std::snprintf(accessibility_text,
                           sizeof(accessibility_text),
-                          "Lesbarkeit: %s",
-                          Settings.Video.HighContrast ? "Hoch" : "Normal");
+                          TiberianDawn_LocalizedText("visual_readability_format"),
+                          TiberianDawn_LocalizedText(Settings.Video.HighContrast ? "visual_readability_high"
+                                                                              : "visual_readability_normal"));
             accessibilitybtn.Set_Text(accessibility_text, false);
             accessibilitybtn.Flag_To_Redraw();
             Refresh_Video_Layout();

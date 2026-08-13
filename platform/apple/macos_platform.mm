@@ -2,6 +2,8 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_platform.h"
+#include "common/ipados_audio_engine.h"
+#include "common/ipados_localization.h"
 #include "third_party/unshieldv3/ISArchiveV3.h"
 
 #include <algorithm>
@@ -28,6 +30,31 @@ NSURL* GameDataURL()
     return [[[support URLByAppendingPathComponent:@"Tiberian Dawn" isDirectory:YES]
         URLByAppendingPathComponent:@"Game Data" isDirectory:YES]
         URLByAppendingPathComponent:@"vanillatd" isDirectory:YES];
+}
+
+NSURL* UserDataURL()
+{
+    NSURL* support = [NSFileManager.defaultManager URLsForDirectory:NSApplicationSupportDirectory
+                                                           inDomains:NSUserDomainMask].firstObject;
+    return [[[support URLByAppendingPathComponent:@"Tiberian Dawn" isDirectory:YES]
+        URLByAppendingPathComponent:@"User Data" isDirectory:YES]
+        URLByAppendingPathComponent:@"vanillatd" isDirectory:YES];
+}
+
+const char* const LanguagePreferenceKey = "TiberianDawnLanguagePreference";
+
+int StoredLanguagePreference()
+{
+    const NSInteger value = [NSUserDefaults.standardUserDefaults integerForKey:@(LanguagePreferenceKey)];
+    return value >= IPAD_LANGUAGE_SYSTEM && value <= IPAD_LANGUAGE_ENGLISH
+        ? static_cast<int>(value)
+        : IPAD_LANGUAGE_SYSTEM;
+}
+
+IPadLanguage EffectiveLanguage()
+{
+    NSString* language = NSLocale.preferredLanguages.firstObject ?: @"en";
+    return Resolve_IPad_Language(StoredLanguagePreference(), language.UTF8String);
 }
 
 bool Exists(NSURL* directory, NSString* relative)
@@ -351,7 +378,7 @@ void ShowCompleted()
 }
 } // namespace
 
-bool TiberianDawnForMac_PrepareGameData(void)
+bool TiberianDawn_PrepareGameData(void)
 {
     @autoreleasepool {
         NSURL* destination = GameDataURL();
@@ -419,4 +446,109 @@ bool TiberianDawnForMac_PrepareGameData(void)
         }
         return false;
     }
+}
+
+void TiberianDawn_ConfigureAudioSession(void)
+{
+    IPad_Audio_Resume();
+}
+
+bool TiberianDawn_RebuildAudioEngine(void)
+{
+    return IPad_Audio_Rebuild();
+}
+
+void TiberianDawn_SetCompactWindowWarning(bool visible)
+{
+    (void)visible;
+}
+
+void TiberianDawn_ManageSaveGames(void)
+{
+    @autoreleasepool {
+        NSURL* directory = UserDataURL();
+        [NSFileManager.defaultManager createDirectoryAtURL:directory
+                               withIntermediateDirectories:YES
+                                                attributes:nil
+                                                     error:nil];
+        NSAlert* alert = [NSAlert new];
+        alert.alertStyle = NSAlertStyleInformational;
+        alert.messageText = Text(@"Spielstände und Dateien", @"Save games and files");
+        alert.informativeText = Text(
+            @"Der Spielstandordner wird im Finder geöffnet. Dort kannst du SAVEGAME-Dateien sicher kopieren, nach iCloud Drive ziehen oder von dort einsetzen. Vorhandene Dateien werden nicht automatisch überschrieben.",
+            @"The save-game folder will open in Finder. You can safely copy SAVEGAME files, move them to iCloud Drive, or restore them from there. Existing files are not overwritten automatically.");
+        [alert addButtonWithTitle:Text(@"Im Finder öffnen", @"Open in Finder")];
+        [alert addButtonWithTitle:Text(@"Abbrechen", @"Cancel")];
+        if ([alert runModal] == NSAlertFirstButtonReturn) {
+            [NSWorkspace.sharedWorkspace activateFileViewerSelectingURLs:@[directory]];
+        }
+    }
+}
+
+int TiberianDawn_GetLanguagePreference(void)
+{
+    return StoredLanguagePreference();
+}
+
+int TiberianDawn_GetEffectiveLanguage(void)
+{
+    return static_cast<int>(EffectiveLanguage());
+}
+
+void TiberianDawn_CycleLanguagePreference(void)
+{
+    const int next = (StoredLanguagePreference() + 1) % 3;
+    [NSUserDefaults.standardUserDefaults setInteger:next forKey:@(LanguagePreferenceKey)];
+}
+
+const char* TiberianDawn_LocalizedText(const char* key)
+{
+    return IPad_Localized_Text(EffectiveLanguage(), key);
+}
+
+const char* TiberianDawn_LanguagePreferenceLabel(void)
+{
+    switch (StoredLanguagePreference()) {
+    case IPAD_LANGUAGE_GERMAN:
+        return TiberianDawn_LocalizedText("language_german");
+    case IPAD_LANGUAGE_ENGLISH:
+        return TiberianDawn_LocalizedText("language_english");
+    default:
+        return TiberianDawn_LocalizedText("language_system");
+    }
+}
+
+const char* TiberianDawn_ClassicLanguageExtension(void)
+{
+    return EffectiveLanguage() == IPAD_EFFECTIVE_GERMAN ? "GER" : "ENG";
+}
+
+void TiberianDawn_GetSafeAreaInsets(void* window,
+                                   int output_width,
+                                   int output_height,
+                                   int* left,
+                                   int* top,
+                                   int* right,
+                                   int* bottom)
+{
+    (void)window;
+    (void)output_width;
+    (void)output_height;
+    if (left) *left = 0;
+    if (top) *top = 0;
+    if (right) *right = 0;
+    if (bottom) *bottom = 0;
+}
+
+int TiberianDawn_IsLowPowerModeEnabled(void)
+{
+    if (@available(macOS 12.0, *)) {
+        return NSProcessInfo.processInfo.lowPowerModeEnabled ? 1 : 0;
+    }
+    return 0;
+}
+
+int TiberianDawn_GetThermalState(void)
+{
+    return static_cast<int>(NSProcessInfo.processInfo.thermalState);
 }

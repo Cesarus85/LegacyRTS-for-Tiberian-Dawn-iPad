@@ -18,7 +18,8 @@ run it. You must supply data from C&C Gold GDI and Nod discs that you are
 legally entitled to use.
 
 [Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad-and-macOS/) · [iPad build guide](README-iPadOS.md) ·
-[macOS build guide](README-macOS.md) · [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
+[macOS build guide](README-macOS.md) · [Apple-platform parity](docs/PLATFORM_PARITY.md) ·
+[Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
 ## Gameplay on iPad
 
@@ -42,7 +43,8 @@ original game data is distributed with this repository.
 - Built-in resolution and presentation scaler with full-size sharp and integer
   pixel-perfect modes, preserving the original 640 × 400 aspect ratio
 - Metal-accelerated SDL rendering
-- iPadOS audio-session handling for interruptions and route changes
+- Optional modern-art mode for cursor and initial GDI/Nod units
+- AVAudioEngine audio on both platforms, with iPadOS interruption and route handling
 - No analytics, accounts, or advertising
 
 The original campaigns, missions, videos, audio, and languages come from the
@@ -125,6 +127,11 @@ or original game files are used during compilation.
 On first launch, the bilingual importer accepts the GDI and Nod Gold ISOs either
 together or one after the other. See the complete [macOS guide](README-macOS.md)
 for paths, signing details, and the manual build command.
+
+The macOS build uses the same Metal renderer, presentation scaler, modern-art
+mode, accessibility controls, localization, save access, and AVAudioEngine
+backend as the iPad build. Platform-only differences are documented in the
+[parity policy](docs/PLATFORM_PARITY.md).
 
 ## Known limitations
 

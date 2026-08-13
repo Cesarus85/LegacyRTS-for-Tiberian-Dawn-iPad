@@ -69,11 +69,50 @@ void Refresh_Video_Layout();
 #if defined(IPADOS_PORT) || defined(MACOS_PORT)
 void Set_Video_Mouse_Window(float window_x, float window_y, int& game_x, int& game_y);
 #endif
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& game_x, int& game_y);
 void Set_Video_Render_Active(bool active);
 void Video_Record_Input_Timestamp(uint32_t timestamp_ms);
 void Video_Set_Touch_Feedback(int game_x, int game_y, bool pencil, bool released);
+// 0 = original/action cursor, 1 = normal pointer eligible for HD artwork.
+void Video_Set_Cursor_Kind(int kind);
+void Video_Set_Selection_Overlay(const void* object,
+                                 int x,
+                                 int y,
+                                 int width,
+                                 int height,
+                                 unsigned char palette_index);
+void Video_Remove_Selection_Overlay(const void* object);
+void Video_Set_HD_Buggy_Component(const void* object,
+                                  int component,
+                                  int frame,
+                                  int center_x,
+                                  int center_y,
+                                  unsigned char palette_index);
+void Video_Set_HD_Vehicle_Component(const void* object,
+                                    int vehicle_kind,
+                                    int component,
+                                    int frame,
+                                    int center_x,
+                                    int center_y,
+                                    unsigned char palette_index);
+void Video_Set_HD_Infantry(const void* object,
+                           int frame,
+                           int center_x,
+                           int center_y,
+                           unsigned char palette_index);
+void Video_Set_HD_Health(const void* object,
+                         bool visible,
+                         int x,
+                         int y,
+                         int width,
+                         int fill_width,
+                         unsigned char palette_index);
+void Video_Remove_HD_Artwork(const void* object);
+bool Video_Uses_HD_Buggy_Artwork();
+bool Video_Uses_HD_Humvee_Artwork();
+bool Video_Uses_HD_Minigunner_Artwork();
+bool Video_Uses_Modern_Artwork();
 void Set_IPadOS_Text_Input_Rect(int game_x, int game_y, int game_w, int game_h);
 int Video_Get_Effective_Frame_Limit();
 bool Video_Render_Frame();

@@ -19,7 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check public source tree
-        run: ./scripts/check-release-tree.sh
+        run: |
+          ./scripts/check-release-tree.sh
+          sh scripts/check-apple-parity.sh
       - name: Check safe Xcode starter
         run: |
           sh -n "Open Tiberian Dawn for iPad.command"

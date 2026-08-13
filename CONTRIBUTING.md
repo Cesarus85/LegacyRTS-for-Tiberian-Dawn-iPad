@@ -1,5 +1,9 @@
 # Contributing
 
+The iPadOS and macOS apps must remain at feature parity wherever Apple APIs
+allow it. Read [docs/PLATFORM_PARITY.md](docs/PLATFORM_PARITY.md) before changing
+shared gameplay, graphics, audio, menus, localization, saves, or resources.
+
 Thank you for helping improve Tiberian Dawn for iPad and macOS.
 
 ## Before submitting a change

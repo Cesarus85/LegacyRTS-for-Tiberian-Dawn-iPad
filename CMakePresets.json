@@ -97,7 +97,7 @@
                 "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
                 "CMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH": "YES",
-                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnForiPad-iPad-Simulator-Products",
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnApple-iPad-Simulator-Products",
                 "BUILD_VANILLATD": "ON",
                 "BUILD_VANILLARA": "OFF",
                 "BUILD_REMASTERTD": "OFF",
@@ -118,7 +118,7 @@
             "binaryDir": "${sourceDir}/build/ipados-device",
             "cacheVariables": {
                 "CMAKE_OSX_SYSROOT": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk",
-                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnForiPad-iPad-Device-Products",
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnApple-iPad-Device-Products",
                 "IPADOS_BUNDLE_IDENTIFIER": "org.tiberiandawn.ipad"
             }
         },
@@ -143,7 +143,7 @@
                 "NETWORKING": "OFF",
                 "SDL1": "OFF",
                 "SDL2": "ON",
-                "OPENAL": "ON",
+                "OPENAL": "OFF",
                 "MACOS_PORT": "ON",
                 "MAKE_BUNDLE": "ON"
             }

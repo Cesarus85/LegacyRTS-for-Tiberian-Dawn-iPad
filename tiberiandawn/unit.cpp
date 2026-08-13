@@ -2049,6 +2049,17 @@ void UnitClass::Draw_It(int x, int y, WindowNumberType window)
     **	with the render process.
     */
     const bool is_hidden = (Visual_Character() == VISUAL_HIDDEN) && (window != WINDOW_VIRTUAL);
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    const bool hd_vehicle_type = *this == UNIT_BUGGY || *this == UNIT_JEEP;
+    const int hd_vehicle_kind = *this == UNIT_JEEP ? 1 : 0;
+    const bool hd_vehicle_available = hd_vehicle_kind == 1 ? Video_Uses_HD_Humvee_Artwork()
+                                                           : Video_Uses_HD_Buggy_Artwork();
+    const bool use_hd_vehicle = hd_vehicle_type && window == WINDOW_TACTICAL
+                                && Visual_Character() == VISUAL_NORMAL && hd_vehicle_available;
+    if (hd_vehicle_type && window == WINDOW_TACTICAL && !use_hd_vehicle) {
+        Video_Remove_HD_Artwork(this);
+    }
+#endif
     if (!is_hidden) {
 
         /*
@@ -2174,7 +2185,24 @@ void UnitClass::Draw_It(int x, int y, WindowNumberType window)
         // if (*this == UNIT_HOVER) {
         //	Mono_Printf("Display hover %p %d.\n", shapefile, shapenum);
         //}
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+        if (!use_hd_vehicle) {
+            Techno_Draw_Object(shapefile, shapenum, x, y, window);
+        }
+        if (use_hd_vehicle) {
+            const int origin_x = WindowList[window][WINDOWX] + LogicPage->Get_XPos();
+            const int origin_y = WindowList[window][WINDOWY] + LogicPage->Get_YPos();
+            Video_Set_HD_Vehicle_Component(this,
+                                         hd_vehicle_kind,
+                                         0,
+                                         shapenum,
+                                         origin_x + x,
+                                         origin_y + y,
+                                         House ? House->Class->BrightColor : WHITE);
+        }
+#else
         Techno_Draw_Object(shapefile, shapenum, x, y, window);
+#endif
 
         /*
         **	Special wake drawing occurs here for virtual rendering
@@ -2245,7 +2273,24 @@ void UnitClass::Draw_It(int x, int y, WindowNumberType window)
             /*
             **	Actually perform the draw. Overlay an optional shimmer effect as necessary.
             */
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+            if (!use_hd_vehicle) {
+                Techno_Draw_Object(shapefile, shapenum, x1, y1, window);
+            }
+            if (use_hd_vehicle) {
+                const int origin_x = WindowList[window][WINDOWX] + LogicPage->Get_XPos();
+                const int origin_y = WindowList[window][WINDOWY] + LogicPage->Get_YPos();
+                Video_Set_HD_Vehicle_Component(this,
+                                             hd_vehicle_kind,
+                                             1,
+                                             shapenum,
+                                             origin_x + x1,
+                                             origin_y + y1,
+                                             House ? House->Class->BrightColor : WHITE);
+            }
+#else
             Techno_Draw_Object(shapefile, shapenum, x1, y1, window);
+#endif
         }
 
         /*

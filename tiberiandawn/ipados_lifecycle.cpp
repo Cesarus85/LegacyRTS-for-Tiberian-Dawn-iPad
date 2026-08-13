@@ -5,6 +5,7 @@
 #include "common/app_lifecycle.h"
 #include "common/debugstring.h"
 #include "common/paths.h"
+#include "common/recovery_transaction.h"
 #include "common/settings.h"
 
 #include <algorithm>
@@ -17,7 +18,7 @@
 
 extern bool InMovie;
 extern bool Get_Savefile_Info(const char* file_name, char* buf, unsigned* scenp, HousesType* housep);
-extern "C" void TiberianDawnForiPad_EndBackgroundTask(void);
+extern "C" void TiberianDawn_EndBackgroundTask(void);
 
 namespace
 {
@@ -83,21 +84,6 @@ bool Can_Autosave_Current_Game(void)
            && (GameToPlay == GAME_NORMAL || GameToPlay == GAME_SKIRMISH);
 }
 
-std::string Select_Autosave_Target(void)
-{
-    struct stat status[2];
-    const std::string paths[2] = {User_File_Path(AutosaveNames[0]), User_File_Path(AutosaveNames[1])};
-    const bool exists[2] = {stat(paths[0].c_str(), &status[0]) == 0, stat(paths[1].c_str(), &status[1]) == 0};
-
-    if (!exists[0]) {
-        return paths[0];
-    }
-    if (!exists[1]) {
-        return paths[1];
-    }
-    return Modification_Time_Is_Older_Or_Equal(status[0], status[1]) ? paths[0] : paths[1];
-}
-
 bool Write_Recovery_Autosave(void)
 {
     if (!Can_Autosave_Current_Game() || AutosaveInProgress) {
@@ -109,29 +95,27 @@ bool Write_Recovery_Autosave(void)
 
     AutosaveInProgress = true;
     const std::string temporary_path = User_File_Path(AutosaveTemporaryName);
-    const std::string target_path = Select_Autosave_Target();
-    unlink(temporary_path.c_str());
+    const RecoveryCommitResult result = Commit_Recovery_File(
+        temporary_path,
+        User_File_Path(AutosaveNames[0]),
+        User_File_Path(AutosaveNames[1]),
+        Paths.User_Path(),
+        [](const std::string& path) { return Save_Game(path.c_str(), "iPadOS recovery autosave"); });
 
-    const bool saved = Save_Game(temporary_path.c_str(), "iPadOS recovery autosave");
-    bool committed = false;
-    if (saved) {
-        Sync_File(temporary_path);
-        committed = rename(temporary_path.c_str(), target_path.c_str()) == 0;
-        if (committed) {
-            Sync_User_Directory();
-            CachedRecoveryPath = target_path;
-            HasAutosavedFrame = true;
-            AutosavedFrame = Frame;
-            DBG_INFO("Committed iPadOS recovery autosave to %s", target_path.c_str());
+    if (result.committed) {
+        CachedRecoveryPath = result.target_path;
+        HasAutosavedFrame = true;
+        AutosavedFrame = Frame;
+        if (result.durable) {
+            DBG_INFO("Committed iPadOS recovery autosave to %s", result.target_path.c_str());
+        } else {
+            DBG_ERROR("Recovery autosave was committed but directory sync failed");
         }
-    }
-
-    if (!committed) {
-        unlink(temporary_path.c_str());
-        DBG_ERROR("Unable to commit iPadOS recovery autosave");
+    } else {
+        DBG_ERROR("Unable to commit iPadOS recovery autosave (error %d)", static_cast<int>(result.error));
     }
     AutosaveInProgress = false;
-    return committed;
+    return result.committed;
 }
 
 bool Find_Latest_Valid_Autosave(std::string& result)
@@ -178,7 +162,7 @@ void Handle_Lifecycle_Event(AppLifecycleEvent event)
     case APP_LIFECYCLE_ENTERED_BACKGROUND:
         Flush_Settings();
         Write_Recovery_Autosave();
-        TiberianDawnForiPad_EndBackgroundTask();
+        TiberianDawn_EndBackgroundTask();
         break;
     case APP_LIFECYCLE_LOW_MEMORY:
         if (!InMovie) {

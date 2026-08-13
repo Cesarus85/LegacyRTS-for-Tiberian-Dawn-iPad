@@ -758,6 +758,10 @@ void ObjectClass::Unselect(void)
         // Updated to function for multiplayer - 6/26/2019 JAS
         Set_Unselected_By_Player();
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+        Video_Remove_Selection_Overlay(this);
+#endif
+
         if (In_Which_Layer() == LAYER_GROUND) {
             Mark(MARK_OVERLAP_DOWN);
         }
@@ -782,6 +786,9 @@ void ObjectClass::Unselect(void)
  *=============================================================================================*/
 void ObjectClass::Unselect_All_Players(void)
 {
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    Video_Remove_Selection_Overlay(this);
+#endif
     CurrentObject.Delete_All(this);
 
     if (In_Which_Layer() == LAYER_GROUND) {
@@ -1140,6 +1147,9 @@ void ObjectClass::Mark_For_Redraw(void)
  *=============================================================================================*/
 bool ObjectClass::Limbo(void)
 {
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    Video_Remove_HD_Artwork(this);
+#endif
     if (GameActive && !IsInLimbo) {
 
         // Unselect();

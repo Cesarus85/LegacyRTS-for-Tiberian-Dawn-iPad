@@ -128,12 +128,15 @@ set(TIBDAWN_SRC
 if(IPADOS_PORT)
     list(APPEND TIBDAWN_SRC
         ipados_lifecycle.cpp
+        ipados_save_bridge.cpp
+        ${CMAKE_SOURCE_DIR}/common/ipados_localization.cpp
         ${CMAKE_SOURCE_DIR}/platform/apple/ipados_platform.mm
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
     )
 elseif(MACOS_PORT)
     list(APPEND TIBDAWN_SRC
+        ${CMAKE_SOURCE_DIR}/common/ipados_localization.cpp
         ${CMAKE_SOURCE_DIR}/platform/apple/macos_platform.mm
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
@@ -253,9 +256,34 @@ if(BUILD_VANILLATD)
                 ${CMAKE_SOURCE_DIR}/platform/apple/PrivacyInfo.xcprivacy
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources
             )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/manifest.ini
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/ui
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/buggy
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/humvee
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/minigunner
+            )
             target_sources(TiberianDawn PRIVATE
                 ${CMAKE_SOURCE_DIR}/resources/ipados/Assets.xcassets
                 ${CMAKE_SOURCE_DIR}/platform/apple/PrivacyInfo.xcprivacy
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/manifest.ini
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
             )
             set_target_properties(TiberianDawn PROPERTIES
                 MACOSX_BUNDLE_GUI_IDENTIFIER "${IPADOS_BUNDLE_IDENTIFIER}"
@@ -268,7 +296,7 @@ if(BUILD_VANILLATD)
                 XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES"
                 XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
             )
-            target_link_libraries(TiberianDawn "-framework UIKit" "-framework AVFAudio" "-framework UniformTypeIdentifiers")
+            target_link_libraries(TiberianDawn "-framework UIKit" "-framework AVFAudio" "-framework Metal" "-framework MetalKit" "-framework QuartzCore" "-framework UniformTypeIdentifiers")
             if(IPADOS_DEVELOPMENT_TEAM)
                 set_target_properties(TiberianDawn PROPERTIES
                     XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${IPADOS_DEVELOPMENT_TEAM}"
@@ -280,8 +308,33 @@ if(BUILD_VANILLATD)
                 ${CMAKE_SOURCE_DIR}/resources/macos/Assets.xcassets
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources
             )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/manifest.ini
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/ui
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/buggy
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/humvee
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/minigunner
+            )
             target_sources(TiberianDawn PRIVATE
                 ${CMAKE_SOURCE_DIR}/resources/macos/Assets.xcassets
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/manifest.ini
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
             )
             set_target_properties(TiberianDawn PROPERTIES
                 MACOSX_BUNDLE_GUI_IDENTIFIER "org.tiberiandawn.macos"
@@ -291,7 +344,7 @@ if(BUILD_VANILLATD)
                 XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.tiberiandawn.macos"
                 XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
             )
-            target_link_libraries(TiberianDawn "-framework AppKit" "-framework UniformTypeIdentifiers")
+            target_link_libraries(TiberianDawn "-framework AppKit" "-framework AVFAudio" "-framework Metal" "-framework MetalKit" "-framework QuartzCore" "-framework UniformTypeIdentifiers")
         endif()
     endif()
 

@@ -165,6 +165,9 @@ bool MouseClass::Override_Mouse_Shape(MouseType mouse, bool wwsmall)
 #endif
         baseshp = (wwsmall) ? control->SmallFrame : control->StartFrame;
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+        Video_Set_Cursor_Kind(mouse == MOUSE_NORMAL ? 1 : 0);
+#endif
         Set_Mouse_Cursor(control->X, control->Y, Extract_Shape(MouseShapes, baseshp + Frame / 4));
         CurrentMouseShape = mouse;
         IsSmall = wwsmall;

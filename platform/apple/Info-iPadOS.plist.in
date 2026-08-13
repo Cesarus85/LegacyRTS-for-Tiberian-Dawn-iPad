@@ -4,8 +4,13 @@
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>de</string>
+    </array>
     <key>CFBundleDisplayName</key>
-    <string>Tiberian Dawn for iPad</string>
+    <string>${IPADOS_DISPLAY_NAME}</string>
     <key>CFBundleExecutable</key>
     <string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
     <key>CFBundleIdentifier</key>
@@ -28,6 +33,41 @@
     <true/>
     <key>LSSupportsOpeningDocumentsInPlace</key>
     <true/>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>org.tiberiandawn.cncsave</string>
+            <key>UTTypeDescription</key>
+            <string>Command &amp; Conquer Tiberian Dawn Spielstand</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>cncsave</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Command &amp; Conquer Spielstand</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>org.tiberiandawn.cncsave</string>
+            </array>
+        </dict>
+    </array>
     <key>UIStatusBarHidden</key>
     <true/>
     <key>UILaunchScreen</key>
@@ -49,6 +89,6 @@
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>NSHumanReadableCopyright</key>
-    <string>Independent modified open-source port. Not affiliated with or endorsed by Electronic Arts.</string>
+    <string>${MACOSX_BUNDLE_COPYRIGHT}</string>
 </dict>
 </plist>

@@ -36,17 +36,16 @@ void PathsClass::Init(const char* suffix, const char* ini_name, const char* data
         Suffix = suffix;
     }
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    if (!TiberianDawn_PrepareGameData()) {
 #ifdef IPADOS_PORT
-    if (!TiberianDawnForiPad_PrepareGameData()) {
         DBG_WARN("iPadOS game-data preparation was cancelled or failed");
+#else
+        DBG_WARN("macOS game-data preparation was cancelled or failed");
+#endif
         // The engine cannot present a useful screen without original data.
         // A later first-run choice therefore ends cleanly and the guide is
         // shown again on the next launch.
-        exit(EXIT_SUCCESS);
-    }
-#elif defined(MACOS_PORT)
-    if (!TiberianDawnForMac_PrepareGameData()) {
-        DBG_WARN("macOS game-data preparation was cancelled or failed");
         exit(EXIT_SUCCESS);
     }
 #endif

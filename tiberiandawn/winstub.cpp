@@ -99,6 +99,12 @@ void Focus_Restore(void)
 #endif
 #ifdef SDL_BUILD
     if (GameInFocus) {
+#ifdef IPADOS_PORT
+        // Route changes can stop the native engine without sending a matching
+        // focus-loss event. Resume it even while the game remains foreground.
+        VQA_ResumeAudio();
+        Start_Primary_Sound_Buffer(true);
+#endif
         return;
     }
     GameInFocus = true;

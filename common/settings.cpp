@@ -43,6 +43,7 @@ SettingsClass::SettingsClass()
 #endif
     Video.BatterySaving = false;
     Video.PresentationMode = 0;
+    Video.ArtworkMode = 0;
     Video.TouchUIScale = 100;
     Video.LargeCursor = false;
     Video.HighContrast = false;
@@ -83,10 +84,18 @@ void SettingsClass::Load(INIClass& ini)
     Video.Height = ini.Get_Int("Video", "Height", Video.Height);
     Video.FrameLimit = ini.Get_Int("Video", "FrameLimit", Video.FrameLimit);
     Video.BatterySaving = ini.Get_Bool("Video", "BatterySaving", Video.BatterySaving);
-    Video.PresentationMode = Bound(ini.Get_Int("iPadOS", "PresentationMode", Video.PresentationMode), 0, 1);
+    // Read the former iPadOS section first so existing installations retain
+    // their choices, then prefer the shared Apple section used by both apps.
+    Video.PresentationMode = Bound(ini.Get_Int("iPadOS", "PresentationMode", Video.PresentationMode), 0, 2);
+    Video.ArtworkMode = Bound(ini.Get_Int("iPadOS", "ArtworkMode", Video.ArtworkMode), 0, 1);
     Video.TouchUIScale = Bound(ini.Get_Int("iPadOS", "TouchUIScale", Video.TouchUIScale), 100, 150);
     Video.LargeCursor = ini.Get_Bool("iPadOS", "LargeCursor", Video.LargeCursor);
     Video.HighContrast = ini.Get_Bool("iPadOS", "HighContrast", Video.HighContrast);
+    Video.PresentationMode = Bound(ini.Get_Int("Apple", "PresentationMode", Video.PresentationMode), 0, 2);
+    Video.ArtworkMode = Bound(ini.Get_Int("Apple", "ArtworkMode", Video.ArtworkMode), 0, 1);
+    Video.TouchUIScale = Bound(ini.Get_Int("Apple", "UIScale", Video.TouchUIScale), 100, 150);
+    Video.LargeCursor = ini.Get_Bool("Apple", "LargeCursor", Video.LargeCursor);
+    Video.HighContrast = ini.Get_Bool("Apple", "HighContrast", Video.HighContrast);
     Video.HardwareCursor = ini.Get_Bool("Video", "HardwareCursor", Video.HardwareCursor);
     Video.DOSMode = ini.Get_Bool("Video", "DOSMode", Video.DOSMode);
     Video.Scaler = ini.Get_String("Video", "Scaler", Video.Scaler);
@@ -138,10 +147,11 @@ void SettingsClass::Save(INIClass& ini)
     ini.Put_Int("Video", "Height", Video.Height);
     ini.Put_Int("Video", "FrameLimit", Video.FrameLimit);
     ini.Put_Bool("Video", "BatterySaving", Video.BatterySaving);
-    ini.Put_Int("iPadOS", "PresentationMode", Video.PresentationMode);
-    ini.Put_Int("iPadOS", "TouchUIScale", Video.TouchUIScale);
-    ini.Put_Bool("iPadOS", "LargeCursor", Video.LargeCursor);
-    ini.Put_Bool("iPadOS", "HighContrast", Video.HighContrast);
+    ini.Put_Int("Apple", "PresentationMode", Video.PresentationMode);
+    ini.Put_Int("Apple", "ArtworkMode", Video.ArtworkMode);
+    ini.Put_Int("Apple", "UIScale", Video.TouchUIScale);
+    ini.Put_Bool("Apple", "LargeCursor", Video.LargeCursor);
+    ini.Put_Bool("Apple", "HighContrast", Video.HighContrast);
     ini.Put_Bool("Video", "HardwareCursor", Video.HardwareCursor);
     ini.Put_Bool("Video", "DOSMode", Video.DOSMode);
     ini.Put_String("Video", "Scaler", Video.Scaler);

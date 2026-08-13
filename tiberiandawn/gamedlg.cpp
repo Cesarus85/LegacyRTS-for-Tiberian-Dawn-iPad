@@ -38,8 +38,13 @@
 #include "sounddlg.h"
 #include "visudlg.h"
 #include "common/framelimit.h"
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #include "common/settings.h"
+#ifdef IPADOS_PORT
+#include "platform/apple/ipados_platform.h"
+#else
+#include "platform/apple/macos_platform.h"
+#endif
 #include <cstdio>
 #include <SDL.h>
 
@@ -49,19 +54,19 @@ const char* Controller_Button_Help()
 {
     SDL_GameController* controller = SDL_GameControllerFromPlayerIndex(0);
     if (controller == nullptr) {
-        return "Controller werden automatisch erkannt.\nLinker Stick: Zeiger  Rechter Stick: Karte\nVerbinde einen Controller, um sofort zu spielen.";
+        return TiberianDawn_LocalizedText("controller_none");
     }
 
     switch (SDL_GameControllerGetType(controller)) {
     case SDL_CONTROLLER_TYPE_PS3:
     case SDL_CONTROLLER_TYPE_PS4:
     case SDL_CONTROLLER_TYPE_PS5:
-        return "PlayStation\nKreuz: Auswaehlen  Kreis: Abbrechen\nQuadrat: Bewachen  Dreieck: Formation\nL1/R1: Strg/Alt  Options: Bestaetigen";
+        return TiberianDawn_LocalizedText("controller_playstation");
     case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO:
     case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_PAIR:
-        return "Nintendo\nB: Auswaehlen  A: Abbrechen\nY: Bewachen  X: Formation\nL/R: Strg/Alt  Plus: Bestaetigen";
+        return TiberianDawn_LocalizedText("controller_nintendo");
     default:
-        return "Controller\nA: Auswaehlen  B: Abbrechen\nX: Bewachen  Y: Formation\nLB/RB: Strg/Alt  Menu: Bestaetigen";
+        return TiberianDawn_LocalizedText("controller_generic");
     }
 }
 }
@@ -87,8 +92,8 @@ void GameControlsClass::Process(void)
     **	Dialog & button dimensions
     */
     int d_dialog_w = 232 * factor;                               // dialog width
-#ifdef IPADOS_PORT
-    int d_dialog_h = 175 * factor;                               // dialog height
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+    int d_dialog_h = 190 * factor;                               // dialog height
 #else
     int d_dialog_h = 141 * factor;                               // dialog height
 #endif
@@ -121,7 +126,7 @@ void GameControlsClass::Process(void)
     int d_sound_x = d_dialog_x + (20 * factor);
     int d_sound_y = d_visual_y + d_visual_h + d_margin1;
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     int d_battery_w = d_dialog_w - (40 * factor);
     int d_battery_h = 9 * factor;
     int d_battery_x = d_dialog_x + (20 * factor);
@@ -130,6 +135,14 @@ void GameControlsClass::Process(void)
     int d_controller_h = 9 * factor;
     int d_controller_x = d_dialog_x + (20 * factor);
     int d_controller_y = d_battery_y + d_battery_h + d_margin1;
+    int d_language_w = d_dialog_w - (40 * factor);
+    int d_language_h = 9 * factor;
+    int d_language_x = d_dialog_x + (20 * factor);
+    int d_language_y = d_controller_y + d_controller_h + d_margin1;
+    int d_saves_w = d_dialog_w - (40 * factor);
+    int d_saves_h = 9 * factor;
+    int d_saves_x = d_dialog_x + (20 * factor);
+    int d_saves_y = d_language_y + d_language_h + d_margin1;
 #endif
 
     int d_ok_w = 20 * factor;
@@ -146,9 +159,11 @@ void GameControlsClass::Process(void)
         BUTTON_SCROLLRATE,
         BUTTON_VISUAL,
         BUTTON_SOUND,
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
         BUTTON_BATTERY,
         BUTTON_CONTROLLER,
+        BUTTON_LANGUAGE,
+        BUTTON_SAVES,
 #endif
         BUTTON_OK,
         BUTTON_COUNT,
@@ -193,12 +208,12 @@ void GameControlsClass::Process(void)
                               d_sound_w,
                               d_sound_h);
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     char battery_text[32];
     std::snprintf(battery_text,
                   sizeof(battery_text),
-                  "Battery mode: %s",
-                  Settings.Video.BatterySaving ? "ON" : "OFF");
+                  TiberianDawn_LocalizedText("battery_format"),
+                  TiberianDawn_LocalizedText(Settings.Video.BatterySaving ? "state_on" : "state_off"));
     TextButtonClass battery_btn(BUTTON_BATTERY,
                                 battery_text,
                                 TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
@@ -207,12 +222,26 @@ void GameControlsClass::Process(void)
                                 d_battery_w,
                                 d_battery_h);
     TextButtonClass controller_btn(BUTTON_CONTROLLER,
-                                   "Controller layout",
+                                   TiberianDawn_LocalizedText("controller_layout"),
                                    TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
                                    d_controller_x,
                                    d_controller_y,
                                    d_controller_w,
                                    d_controller_h);
+    TextButtonClass language_btn(BUTTON_LANGUAGE,
+                                 TiberianDawn_LanguagePreferenceLabel(),
+                                 TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
+                                 d_language_x,
+                                 d_language_y,
+                                 d_language_w,
+                                 d_language_h);
+    TextButtonClass saves_btn(BUTTON_SAVES,
+                              TiberianDawn_LocalizedText("main_saves"),
+                              TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
+                              d_saves_x,
+                              d_saves_y,
+                              d_saves_w,
+                              d_saves_h);
 #endif
 
     TextButtonClass okbtn(
@@ -232,9 +261,11 @@ void GameControlsClass::Process(void)
     scrate_btn.Add_Tail(*commands);
     visual_btn.Add_Tail(*commands);
     sound_btn.Add_Tail(*commands);
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     battery_btn.Add_Tail(*commands);
     controller_btn.Add_Tail(*commands);
+    language_btn.Add_Tail(*commands);
+    saves_btn.Add_Tail(*commands);
 #endif
 
     /*
@@ -260,10 +291,12 @@ void GameControlsClass::Process(void)
     buttons[1] = NULL;
     buttons[2] = &visual_btn;
     buttons[3] = &sound_btn;
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
     buttons[4] = &battery_btn;
     buttons[5] = &controller_btn;
-    buttons[6] = &okbtn;
+    buttons[6] = &language_btn;
+    buttons[7] = &saves_btn;
+    buttons[8] = &okbtn;
 #else
     buttons[4] = &okbtn;
 #endif
@@ -390,13 +423,21 @@ void GameControlsClass::Process(void)
             pressed = true;
             break;
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
         case (BUTTON_BATTERY | KN_BUTTON):
             selection = BUTTON_BATTERY;
             pressed = true;
             break;
         case (BUTTON_CONTROLLER | KN_BUTTON):
             selection = BUTTON_CONTROLLER;
+            pressed = true;
+            break;
+        case (BUTTON_LANGUAGE | KN_BUTTON):
+            selection = BUTTON_LANGUAGE;
+            pressed = true;
+            break;
+        case (BUTTON_SAVES | KN_BUTTON):
+            selection = BUTTON_SAVES;
             pressed = true;
             break;
 #endif
@@ -476,19 +517,44 @@ void GameControlsClass::Process(void)
         */
         if (pressed) {
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
             if (selection == BUTTON_CONTROLLER) {
                 WWMessageBox().Process(Controller_Button_Help(), TXT_OK);
                 pressed = false;
                 display = true;
                 continue;
             }
+            if (selection == BUTTON_SAVES) {
+                TiberianDawn_ManageSaveGames();
+                Keyboard->Clear();
+                pressed = false;
+                display = true;
+                refresh = true;
+                continue;
+            }
+            if (selection == BUTTON_LANGUAGE) {
+                TiberianDawn_CycleLanguagePreference();
+                std::snprintf(battery_text,
+                              sizeof(battery_text),
+                              TiberianDawn_LocalizedText("battery_format"),
+                              TiberianDawn_LocalizedText(Settings.Video.BatterySaving ? "state_on" : "state_off"));
+                battery_btn.Set_Text(battery_text, false);
+                controller_btn.Set_Text(TiberianDawn_LocalizedText("controller_layout"), false);
+                language_btn.Set_Text(TiberianDawn_LanguagePreferenceLabel(), false);
+                saves_btn.Set_Text(TiberianDawn_LocalizedText("main_saves"), false);
+                WWMessageBox().Process(TiberianDawn_LocalizedText("language_restart_notice"),
+                                       TiberianDawn_LocalizedText("ok"));
+                pressed = false;
+                display = true;
+                refresh = true;
+                continue;
+            }
             if (selection == BUTTON_BATTERY) {
                 Settings.Video.BatterySaving = !Settings.Video.BatterySaving;
                 std::snprintf(battery_text,
                               sizeof(battery_text),
-                              "Battery mode: %s",
-                              Settings.Video.BatterySaving ? "ON" : "OFF");
+                              TiberianDawn_LocalizedText("battery_format"),
+                              TiberianDawn_LocalizedText(Settings.Video.BatterySaving ? "state_on" : "state_off"));
                 battery_btn.Set_Text(battery_text, false);
                 battery_btn.Flag_To_Redraw();
             }
@@ -542,7 +608,7 @@ void GameControlsClass::Process(void)
                 }
                 break;
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
             case (BUTTON_BATTERY):
                 process = true;
                 refresh = true;

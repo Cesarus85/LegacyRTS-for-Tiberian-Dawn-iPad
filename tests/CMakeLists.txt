@@ -1,5 +1,45 @@
 add_custom_target(tests)
-add_dependencies(tests test_miscasm test_face test_rect test_fading test_lcw test_xordelta test_irandom test_fatpixel test_tobuff test_drawline test_putpixel test_drawbuff)
+add_dependencies(tests test_miscasm test_face test_rect test_fading test_lcw test_xordelta test_irandom test_fatpixel test_tobuff test_drawline test_putpixel test_drawbuff test_ipados_layout test_ipados_localization test_audio_queue_state test_app_lifecycle test_recovery_transaction test_install_transaction test_iso9660 test_isarchivev3 test_savegame_transfer test_hd_asset_pack)
+
+add_executable(test_ipados_layout ipados_layout.cpp ../common/ipados_layout.cpp)
+target_include_directories(test_ipados_layout PUBLIC .. ../common)
+add_test(NAME ipados_layout COMMAND $<TARGET_FILE:test_ipados_layout>)
+
+add_executable(test_ipados_localization ipados_localization.cpp ../common/ipados_localization.cpp)
+target_include_directories(test_ipados_localization PUBLIC .. ../common)
+add_test(NAME ipados_localization COMMAND $<TARGET_FILE:test_ipados_localization>)
+
+add_executable(test_hd_asset_pack hd_asset_pack.cpp ../common/hd_asset_pack.cpp)
+target_include_directories(test_hd_asset_pack PUBLIC .. ../common)
+add_test(NAME hd_asset_pack COMMAND $<TARGET_FILE:test_hd_asset_pack>)
+
+add_executable(test_audio_queue_state audio_queue_state.cpp ../common/audio_queue_state.cpp)
+target_include_directories(test_audio_queue_state PUBLIC .. ../common)
+add_test(NAME audio_queue_state COMMAND $<TARGET_FILE:test_audio_queue_state>)
+
+add_executable(test_app_lifecycle app_lifecycle.cpp ../common/app_lifecycle.cpp)
+target_include_directories(test_app_lifecycle PUBLIC .. ../common)
+add_test(NAME app_lifecycle COMMAND $<TARGET_FILE:test_app_lifecycle>)
+
+add_executable(test_recovery_transaction recovery_transaction.cpp ../common/recovery_transaction.cpp)
+target_include_directories(test_recovery_transaction PUBLIC .. ../common)
+add_test(NAME recovery_transaction COMMAND $<TARGET_FILE:test_recovery_transaction>)
+
+add_executable(test_install_transaction install_transaction.cpp ../common/install_transaction.cpp)
+target_include_directories(test_install_transaction PUBLIC .. ../common)
+add_test(NAME install_transaction COMMAND $<TARGET_FILE:test_install_transaction>)
+
+add_executable(test_iso9660 iso9660.cpp ../common/iso9660.cpp)
+target_include_directories(test_iso9660 PUBLIC .. ../common)
+add_test(NAME iso9660 COMMAND $<TARGET_FILE:test_iso9660>)
+
+add_executable(test_isarchivev3 isarchivev3.cpp ../third_party/unshieldv3/ISArchiveV3.cpp ../third_party/unshieldv3/blast.c)
+target_include_directories(test_isarchivev3 PUBLIC .. ../third_party/unshieldv3)
+add_test(NAME isarchivev3 COMMAND $<TARGET_FILE:test_isarchivev3>)
+
+add_executable(test_savegame_transfer savegame_transfer.cpp ../common/savegame_transfer.cpp)
+target_include_directories(test_savegame_transfer PUBLIC .. ../common)
+add_test(NAME savegame_transfer COMMAND $<TARGET_FILE:test_savegame_transfer>)
 
 add_executable(test_miscasm miscasm.cpp)
 target_include_directories(test_miscasm PUBLIC .. ../common)
