@@ -87,4 +87,21 @@ const char* DecodeResultText(DecodeResult result)
     }
     return "unknown decode error";
 }
+
+std::uint32_t PeerTargetFromNode(const std::uint8_t node[6], bool marked_broadcast)
+{
+    if (marked_broadcast || node == nullptr) return 0;
+    bool classic_broadcast = true;
+    for (std::size_t index = 0; index < 6; ++index) {
+        if (node[index] != 0xff) {
+            classic_broadcast = false;
+            break;
+        }
+    }
+    if (classic_broadcast) return 0;
+    return (static_cast<std::uint32_t>(node[0]) << 24)
+        | (static_cast<std::uint32_t>(node[1]) << 16)
+        | (static_cast<std::uint32_t>(node[2]) << 8)
+        | static_cast<std::uint32_t>(node[3]);
+}
 } // namespace TiberianDawnRelay

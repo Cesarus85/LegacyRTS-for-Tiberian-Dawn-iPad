@@ -51,6 +51,19 @@ test('private rooms create, authenticate, broadcast, and unicast', async () => {
   assert.equal(broadcast.readUInt32BE(8), hostReady.peerId);
   assert.deepEqual([...broadcast.subarray(24)], [1, 2, 3]);
 
+  const diagnostics = await (await fetch(`http://127.0.0.1:${address.port}/debugz`)).json();
+  assert.equal(diagnostics.rooms.length, 1);
+  assert.deepEqual(diagnostics.rooms[0].peers.map((peer) => ({
+    host: peer.host,
+    framesReceived: peer.framesReceived,
+    framesForwarded: peer.framesForwarded,
+    broadcastsReceived: peer.broadcastsReceived,
+    unicastsReceived: peer.unicastsReceived
+  })), [
+    { host: true, framesReceived: 1, framesForwarded: 0, broadcastsReceived: 1, unicastsReceived: 0 },
+    { host: false, framesReceived: 0, framesForwarded: 1, broadcastsReceived: 0, unicastsReceived: 0 }
+  ]);
+
   const unicastPromise = nextMessage(host);
   guest.send(relayPacket(hostReady.peerId, 8, Buffer.from([4, 5])));
   const unicast = Buffer.from(await unicastPromise);

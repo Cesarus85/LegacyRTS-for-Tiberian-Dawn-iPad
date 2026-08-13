@@ -972,8 +972,9 @@ int Main_Menu(unsigned int timeout)
 #endif
 
         case (BUTTON_MULTI | KN_BUTTON):
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
-            // Reserved for a future iPad multiplayer implementation.
+#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && !defined(NETWORKING)
+            // The Apple menu keeps its layout when networking is omitted, but
+            // the disabled button must not enter the legacy transport dialog.
             break;
 #else
             retval = (input & 0x7FFF) - BUTTON_EXPAND;
@@ -1007,7 +1008,7 @@ int Main_Menu(unsigned int timeout)
             if (curbutton < first_menu_button) {
                 curbutton = last_menu_button;
             }
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && !defined(NETWORKING)
             if (buttons[curbutton] == &multibtn) {
                 curbutton--;
                 if (curbutton < first_menu_button) {
@@ -1026,7 +1027,7 @@ int Main_Menu(unsigned int timeout)
             if (curbutton > last_menu_button) {
                 curbutton = first_menu_button;
             }
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && !defined(NETWORKING)
             if (buttons[curbutton] == &multibtn) {
                 curbutton++;
                 if (curbutton > last_menu_button) {
@@ -1046,16 +1047,21 @@ int Main_Menu(unsigned int timeout)
                 display = true;
                 break;
             }
+#if !defined(NETWORKING)
             if (buttons[curbutton] == &multibtn) {
                 break;
             }
+#endif
 #endif
             buttons[curbutton]->IsPressed = true;
             buttons[curbutton]->Draw_Me(true);
 #if defined(IPADOS_PORT) || defined(MACOS_PORT)
             // The save manager is visually inserted before the remaining
             // legacy entries but is not part of Select_Game's return enum.
-            retval = curbutton - (buttons[curbutton] == &introbtn || buttons[curbutton] == &exitbtn ? 1 : 0);
+            retval = curbutton
+                - (buttons[curbutton] == &multibtn || buttons[curbutton] == &introbtn || buttons[curbutton] == &exitbtn
+                       ? 1
+                       : 0);
 #else
             retval = curbutton;
 #endif

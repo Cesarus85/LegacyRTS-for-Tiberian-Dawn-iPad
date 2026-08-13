@@ -340,16 +340,10 @@ public:
         }
         while (OutBuffers.Count() > 0) {
             WinsockBufferType* packet = OutBuffers[0];
-            std::uint32_t target = 0;
-            if (!packet->IsBroadcast) {
-                unsigned char network[4];
-                unsigned char node[6];
-                reinterpret_cast<IPXAddressClass*>(packet->Address)->Get_Address(network, node);
-                target = (static_cast<std::uint32_t>(node[0]) << 24)
-                    | (static_cast<std::uint32_t>(node[1]) << 16)
-                    | (static_cast<std::uint32_t>(node[2]) << 8)
-                    | static_cast<std::uint32_t>(node[3]);
-            }
+            unsigned char network[4];
+            unsigned char node[6];
+            reinterpret_cast<IPXAddressClass*>(packet->Address)->Get_Address(network, node);
+            const std::uint32_t target = TiberianDawnRelay::PeerTargetFromNode(node, packet->IsBroadcast);
             [RelaySession() sendPayload:packet->Buffer length:packet->BufferLen target:target];
             OutBuffers.Delete(0);
             delete packet;

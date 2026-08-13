@@ -26,7 +26,7 @@ function roomCode(rooms) {
 function peerId(room) {
   for (;;) {
     const id = crypto.randomBytes(4).readUInt32BE(0);
-    if (id !== 0 && !room.peers.has(id)) return id;
+    if (id !== 0 && id !== 0xffffffff && !room.peers.has(id)) return id;
   }
 }
 
@@ -46,6 +46,10 @@ class WebSocketConnection {
     this.lastActivity = Date.now();
     this.tokens = 200;
     this.lastRefill = Date.now();
+    this.framesReceived = 0;
+    this.framesForwarded = 0;
+    this.broadcastsReceived = 0;
+    this.unicastsReceived = 0;
     socket.on('data', (chunk) => this.feed(chunk));
     socket.on('close', () => this.finish());
     socket.on('error', () => this.finish());
@@ -228,11 +232,23 @@ export function createRelayServer(options = {}) {
     }
     const forwarded = Buffer.from(payload);
     forwarded.writeUInt32BE(connection.peerId, 8);
+    connection.framesReceived++;
+    if (target === 0) connection.broadcastsReceived++;
+    else connection.unicastsReceived++;
     connection.room.expiresAt = Date.now() + ROOM_TTL_MS;
     if (target === 0) {
-      for (const [id, peer] of connection.room.peers) if (id !== connection.peerId) peer.send(2, forwarded);
+      for (const [id, peer] of connection.room.peers) {
+        if (id !== connection.peerId) {
+          peer.send(2, forwarded);
+          peer.framesForwarded++;
+        }
+      }
     } else {
-      connection.room.peers.get(target)?.send(2, forwarded);
+      const peer = connection.room.peers.get(target);
+      if (peer) {
+        peer.send(2, forwarded);
+        peer.framesForwarded++;
+      }
     }
   }
 
@@ -240,6 +256,24 @@ export function createRelayServer(options = {}) {
     if (request.url === '/healthz') {
       response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       response.end(JSON.stringify({ ok: true, protocol: PROTOCOL_VERSION, rooms: rooms.size, peers: connections.size }));
+      return;
+    }
+    // Loopback-only operational diagnostics. Apache intentionally exposes
+    // only /healthz and the WebSocket endpoint, never this route. Counters
+    // contain no payloads, invitations, IP addresses, or player names.
+    if (request.url === '/debugz') {
+      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      response.end(JSON.stringify({
+        rooms: [...rooms.values()].map((room) => ({
+          peers: [...room.peers.entries()].map(([id, peer]) => ({
+            host: id === room.hostId,
+            framesReceived: peer.framesReceived,
+            framesForwarded: peer.framesForwarded,
+            broadcastsReceived: peer.broadcastsReceived,
+            unicastsReceived: peer.unicastsReceived
+          }))
+        }))
+      }));
       return;
     }
     response.writeHead(404).end();
