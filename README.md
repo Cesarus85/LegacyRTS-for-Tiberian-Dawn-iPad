@@ -147,6 +147,14 @@ mode, accessibility controls, localization, save access, and AVAudioEngine
 backend as the iPad build. Platform-only differences are documented in the
 [parity policy](docs/PLATFORM_PARITY.md).
 
+The Mac app opens in a large resizable 16:10 window and never confines the
+system pointer, so the title bar and window edges remain reachable during a
+mission. Use the green window control or `Option-Return` to switch full screen.
+The in-game **Image** setting changes presentation scaling rather than the
+game's fixed internal 640x400 resolution: **Sharp** uses adaptive filtering,
+**Pixel-perfect** uses an integer-sized viewport, and **Classic** uses nearest-
+neighbour scaling.
+
 ## Known limitations
 
 - Multiplayer is a beta. Local and private Internet play are implemented and

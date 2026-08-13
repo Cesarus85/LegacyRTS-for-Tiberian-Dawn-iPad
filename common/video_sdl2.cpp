@@ -587,6 +587,29 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     win_flags = SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 #elif defined(MACOS_PORT)
     win_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    if (!Settings.Video.Windowed) {
+        win_w = Settings.Video.Width = 0;
+        win_h = Settings.Video.Height = 0;
+        win_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    } else {
+        win_w = std::max(w, Settings.Video.WindowWidth);
+        win_h = std::max(h, Settings.Video.WindowHeight);
+
+        // Keep the first window comfortably inside the visible desktop,
+        // including the menu bar and Dock, on smaller Mac displays.
+        SDL_Rect usable = {};
+        if (SDL_GetDisplayUsableBounds(0, &usable) == 0 && usable.w > 0 && usable.h > 0) {
+            const int maximum_w = std::max(w, usable.w * 9 / 10);
+            const int maximum_h = std::max(h, usable.h * 9 / 10);
+            const float fit = std::min(1.0f,
+                                       std::min(maximum_w / static_cast<float>(win_w),
+                                                maximum_h / static_cast<float>(win_h)));
+            win_w = std::max(w, static_cast<int>(std::floor(win_w * fit)));
+            win_h = std::max(h, static_cast<int>(std::floor(win_h * fit)));
+        }
+        Settings.Video.WindowWidth = win_w;
+        Settings.Video.WindowHeight = win_h;
+    }
 #else
     if (!Settings.Video.Windowed) {
         /*
@@ -623,7 +646,10 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
         return false;
     }
 
-    DBG_INFO("Created SDL2 %s window in %dx%d", (win_flags ? "fullscreen" : "windowed"), win_w, win_h);
+    DBG_INFO("Created SDL2 %s window in %dx%d",
+             (win_flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) ? "fullscreen" : "windowed",
+             win_w,
+             win_h);
 
     pixel_format = SDL_GetWindowPixelFormat(window);
     if (pixel_format == SDL_PIXELFORMAT_UNKNOWN || SDL_BITSPERPIXEL(pixel_format) < 16) {
@@ -754,6 +780,13 @@ void Toggle_Video_Fullscreen()
     Refresh_Video_Layout();
     return;
 #else
+#ifdef MACOS_PORT
+    // Preserve the user's manually resized window when entering full screen,
+    // so Option-Return restores the exact previous size.
+    if (Settings.Video.Windowed && window) {
+        SDL_GetWindowSize(window, &Settings.Video.WindowWidth, &Settings.Video.WindowHeight);
+    }
+#endif
     Settings.Video.Windowed = !Settings.Video.Windowed;
 
     if (!Settings.Video.Windowed) {
@@ -791,8 +824,12 @@ void Set_Video_Cursor_Clip(bool clipped)
     hwcursor.Clip = clipped;
 
     if (window) {
-#ifdef IPADOS_PORT
-        /* Pointer confinement and relative mode conflict with iPad windowing. */
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+        /*
+        ** Absolute pointer coordinates are used by both Apple ports. Pointer
+        ** confinement conflicts with iPad windowing and prevents Mac users
+        ** from reaching the title bar or resize handles during gameplay.
+        */
         SDL_SetWindowGrab(window, SDL_FALSE);
         SDL_SetRelativeMouseMode(SDL_FALSE);
         return;
