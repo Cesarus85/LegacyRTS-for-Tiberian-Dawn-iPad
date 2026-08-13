@@ -29,6 +29,8 @@
     <true/>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Tiberian Dawn uses the local network only to discover and play private multiplayer matches with devices you choose.</string>
     <key>UIFileSharingEnabled</key>
     <true/>
     <key>LSSupportsOpeningDocumentsInPlace</key>

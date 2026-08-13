@@ -41,6 +41,9 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "function.h"
+#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && defined(NETWORKING)
+#include "common/apple_relay_transport.h"
+#endif
 #ifdef IPADOS_PORT
 #include "ipados_lifecycle.h"
 #endif
@@ -1214,7 +1217,11 @@ bool Select_Game(bool fade)
                     if (PacketTransport)
                         delete PacketTransport;
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+                    PacketTransport = TiberianDawn_CreateNetworkTransport();
+#else
                     PacketTransport = new UDPInterfaceClass;
+#endif
                     assert(PacketTransport != NULL);
 
                     DBG_LOG("C&C - About to call Init_Network.\n");

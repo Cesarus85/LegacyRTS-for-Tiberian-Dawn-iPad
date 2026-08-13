@@ -28,6 +28,8 @@
     <string>11.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Tiberian Dawn uses the local network only to play private multiplayer matches with devices you choose.</string>
     <key>NSHumanReadableCopyright</key>
     <string>Independent community port based on source released under GPLv3 by Electronic Arts.</string>
     <key>NSPrincipalClass</key>

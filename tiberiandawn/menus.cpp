@@ -658,7 +658,7 @@ int Main_Menu(unsigned int timeout)
 #ifdef NEWMENU
 #if defined(IPADOS_PORT) || defined(MACOS_PORT)
     TextButtonClass multibtn(BUTTON_MULTI,
-                             TiberianDawn_LocalizedText("main_multiplayer_unavailable"),
+                             TiberianDawn_LocalizedText("main_multiplayer"),
                              TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
                              D_MULTI_X,
                              starty,
@@ -682,7 +682,7 @@ int Main_Menu(unsigned int timeout)
 #else
 #if defined(IPADOS_PORT) || defined(MACOS_PORT)
     TextButtonClass multibtn(BUTTON_MULTI,
-                             TiberianDawn_LocalizedText("main_multiplayer_unavailable"),
+                             TiberianDawn_LocalizedText("main_multiplayer"),
                              TPF_CENTER | TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_NOSHADOW,
                              D_MULTI_X,
                              D_MULTI_Y,
@@ -700,7 +700,7 @@ int Main_Menu(unsigned int timeout)
 #endif
 #endif
 
-#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && !defined(DEMO)
+#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && !defined(DEMO) && !defined(NETWORKING)
     multibtn.Disable();
 #endif
 

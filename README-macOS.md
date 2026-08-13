@@ -55,6 +55,15 @@ German/English menus, controller input, and AVAudioEngine playback. Open
 See the [platform-parity policy](docs/PLATFORM_PARITY.md) for the deliberately
 native iPad/macOS differences.
 
+## Multiplayer beta
+
+Open **Multiplayer** for direct Local Network play or an expiring Private
+Internet Room. The host-created invitation is copied to the clipboard; guests
+paste the entire invitation on Mac or iPad. The original C&C lobby then handles
+New Game, joining, maps, factions, colors and match options. The Mac firewall
+must permit the app for LAN discovery. Internet rooms use TLS and never upload
+game assets or saves. See [the multiplayer guide](docs/MULTIPLAYER.md).
+
 Immutable game data is stored below:
 
 ```text

@@ -40,6 +40,13 @@ jobs:
         run: brew install cmake ninja sdl2 openal-soft
       - name: Configure, build, and test
         run: cmake --workflow --preset testing
+      - name: Test private-room relay
+        run: node --test multiplayer/relay/test/*.test.mjs
+      - name: Compile native Apple WebSocket smoke
+        run: >-
+          xcrun swiftc -parse-as-library
+          multiplayer/relay/test/apple-websocket-smoke.swift
+          -o "$RUNNER_TEMP/apple-websocket-smoke"
 
   ipados-compile:
     runs-on: macos-15

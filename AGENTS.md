@@ -25,8 +25,8 @@ the same functional level whenever the operating systems permit it.
 - Treat multiplayer as one protocol and simulation feature across Apple
   targets. Platform code may implement discovery, permissions, and lifecycle,
   but must not create incompatible iPad, Mac, or visionOS game rules or wire
-  formats. Follow `docs/MULTIPLAYER-CONCEPT.md` and keep release presets offline
-  until its acceptance gate is met.
+  formats. Follow `docs/MULTIPLAYER-CONCEPT.md`; keep networking enabled and
+  test LAN-independent relay behavior plus both Apple builds for every change.
 - Treat `Designed for iPad` on Apple Vision Pro as a compatibility target, not
   proof of a native port. When `VISIONOS_PORT` is introduced, shared features
   must include it by default and the native compile/device gates in

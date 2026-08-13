@@ -297,7 +297,7 @@ Vision Pro hardware. A Simulator-only result is a prototype, not a port.
 - German/English native UI, VoiceOver, captions/legibility where available;
 - classic and spatial audio, Bluetooth route changes, volume and comfort;
 - 60-minute table/immersion thermal, memory, frame pacing, and latency soak;
-- multiplayer pause and mixed-platform cross-play after networking ships;
+- multiplayer pause and mixed-platform cross-play using the shared networking beta;
 - privacy manifest, permissions, signing, TestFlight, and store validation.
 
 ## Apple references

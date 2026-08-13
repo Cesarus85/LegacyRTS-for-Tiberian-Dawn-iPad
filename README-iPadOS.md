@@ -251,6 +251,19 @@ engine text table is selected on the next app start: `CONQUER.GER` is preferred
 for German when supplied by the original data, with `CONQUER.ENG` as the safe
 fallback.
 
+## Multiplayer beta
+
+Open **Multiplayer** to choose Skirmish, Local Network, Create Private Internet
+Room, or Join Internet Invitation. Local play asks for iPadOS local-network
+permission the first time. Internet hosts receive a complete invitation that is
+copied to the clipboard; guests paste it on their own iPad or Mac. Continue in
+the original lobby, where the host chooses **New Game** and guests select it.
+
+All players need this same app version and matching Gold data. The private TLS
+relay transfers game packets only—never ISOs, maps, saves, or account data. See
+the [complete multiplayer guide](docs/MULTIPLAYER.md) for firewall, privacy and
+current beta limitations.
+
 Physical Stage Manager resizing is verified from fullscreen down to roughly
 375-by-486 points and back. The viewport remains contained, centered and 16:10;
 touch remains aligned; compact guidance appears; and newly exposed letterbox

@@ -4,7 +4,7 @@ Suggested public repository metadata:
 
 - **Repository name:** `Tiberian-Dawn-for-iPad-and-macOS`
 - **Display title:** `Tiberian Dawn for iPad and macOS`
-- **Description:** `Unofficial native iPadOS and macOS port for Command & Conquer: Tiberian Dawn (1995), with touch controls and adaptive resolution scaling. Multiplayer: work in progress. No game assets included.`
+- **Description:** `Unofficial native iPadOS and macOS port for Command & Conquer: Tiberian Dawn (1995), with touch controls, adaptive resolution scaling, LAN and private-room multiplayer. No game assets included.`
 - **Website:** use the GitHub Pages URL after the first Pages deployment
 - **Topics:** `tiberian-dawn`, `command-and-conquer`, `ipad`, `ipados`, `ios`,
   `macos`, `universal-binary`, `rts`, `game-port`, `open-source-game`, `sdl2`, `metal`, `cmake`,

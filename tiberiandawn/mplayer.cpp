@@ -43,6 +43,9 @@
 #include "function.h"
 #include "common/irandom.h"
 #include "common/ini.h"
+#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && defined(NETWORKING)
+#include "common/apple_relay_transport.h"
+#endif
 #include "common/framelimit.h"
 #include "common/ini.h"
 
@@ -73,6 +76,17 @@ GameType Select_MPlayer_Game(void)
 #ifdef REMASTER_BUILD // PG_TO_FIX
     return GAME_NORMAL;
 #else
+#if (defined(IPADOS_PORT) || defined(MACOS_PORT)) && defined(NETWORKING)
+    const int apple_choice = TiberianDawn_SelectMultiplayerTransport();
+    if (apple_choice == TIBERIAN_MULTIPLAYER_NETWORK) return GAME_IPX;
+    if (apple_choice == TIBERIAN_MULTIPLAYER_SKIRMISH) {
+        GameToPlay = GAME_SKIRMISH;
+        Read_MultiPlayer_Settings();
+        if (Com_Scenario_Dialog()) return GAME_SKIRMISH;
+        GameToPlay = GAME_NORMAL;
+    }
+    return GAME_NORMAL;
+#endif
     static const char TXT_SKIRMISH[] = "Skirmish";
     int factor = (SeenBuff.Get_Width() == 320) ? 1 : 2;
     bool ipx_avail = false;
