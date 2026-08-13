@@ -1,9 +1,29 @@
-# Tiberian Dawn iPadOS optimization roadmap
+# Tiberian Dawn Apple-platform roadmap
 
-This document records the iPad-specific audit and implementation work. The
-physical iPad build is now the sole development and acceptance target; the
-simulator build is retained only as an unused legacy fallback. Items below have
-not been implemented unless the current status explicitly says otherwise.
+This document records completed iPad optimization work and the ordered Apple
+platform roadmap. Simulator and physical-device builds are kept side by side:
+the simulator is the rapid iteration target, while physical iPad hardware is
+the acceptance authority for touch, Pencil, performance, lifecycle, audio, and
+releases. Items below have not been implemented unless the current status
+explicitly says otherwise.
+
+## Next major extensions
+
+1. **Modern multiplayer:** preserve the original deterministic lockstep game,
+   introduce a transport-neutral and validated wire boundary, prove two-process
+   loopback, then ship Apple LAN play before private Internet rooms. Networking
+   remains off until the LAN gate passes. See
+   [`docs/MULTIPLAYER-CONCEPT.md`](docs/MULTIPLAYER-CONCEPT.md).
+2. **Apple Vision Pro:** first validate the unchanged iPad app in the
+   `Designed for iPad` Vision destination, then create a native visionOS command
+   window with full feature parity. A tactical-table volume, mixed command-room
+   immersion, and spatial audio are later optional layers around the unchanged
+   2D game. See [`docs/VISIONOS-CONCEPT.md`](docs/VISIONOS-CONCEPT.md).
+
+Multiplayer infrastructure should be designed for future visionOS cross-play
+from its first protocol version. The Vision Pro command-window work does not
+need to wait for Internet multiplayer, and LAN networking does not need to wait
+for spatial presentation.
 
 ## August 2026 production pass
 
@@ -500,14 +520,30 @@ Planned work:
 
 ### Multiplayer
 
-The iPad preset currently builds with networking disabled while the legacy menu
-can still expose multiplayer options. Decide between:
+The decision is to restore and modernize the original deterministic network
+game without changing simulation rules. Apple LAN play is the first release
+target; private Internet rooms follow through an independently operable relay.
+The design specifies native lobby UX, Bonjour/local-network privacy, a
+transport boundary, versioned serialization, determinism hashes, mobile pause
+policy, security limits, and staged release gates in
+[`docs/MULTIPLAYER-CONCEPT.md`](docs/MULTIPLAYER-CONCEPT.md).
 
-- hiding unavailable network choices; or
-- restoring and modernizing LAN/Internet play, including local-network privacy
-  declarations, discovery, background behavior, and compatibility testing.
+Game Center discovery, direct NAT traversal, public matchmaking, spectators,
+and reconnect snapshots remain optional later projects rather than blockers.
 
-Game Center integration is a separate, higher-effort project.
+### Apple Vision Pro
+
+The staged visionOS direction is documented in
+[`docs/VISIONOS-CONCEPT.md`](docs/VISIONOS-CONCEPT.md). The first milestone is
+the existing iPad build in a compatible Shared-Space window. A native target
+then brings the same engine, Metal renderer, AVAudioEngine backend, importer,
+saves, controls, localization, artwork modes, and networking feature gates to a
+visionOS command window.
+
+Optional later presentation modes can place the unchanged 2D framebuffer on a
+volumetric tactical table, add restrained mixed-immersion command-room scenery,
+and spatialize tactical effects. A physical Vision Pro acceptance pass is
+required before the project describes any native target as released.
 
 ### Red Alert
 
