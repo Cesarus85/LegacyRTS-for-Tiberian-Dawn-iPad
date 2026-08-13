@@ -130,6 +130,8 @@ if(IPADOS_PORT)
         ipados_lifecycle.cpp
         ipados_save_bridge.cpp
         ${CMAKE_SOURCE_DIR}/common/ipados_localization.cpp
+        ${CMAKE_SOURCE_DIR}/common/relay_protocol.cpp
+        ${CMAKE_SOURCE_DIR}/platform/apple/apple_relay_transport.mm
         ${CMAKE_SOURCE_DIR}/platform/apple/ipados_platform.mm
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
@@ -137,9 +139,18 @@ if(IPADOS_PORT)
 elseif(MACOS_PORT)
     list(APPEND TIBDAWN_SRC
         ${CMAKE_SOURCE_DIR}/common/ipados_localization.cpp
+        ${CMAKE_SOURCE_DIR}/common/relay_protocol.cpp
+        ${CMAKE_SOURCE_DIR}/platform/apple/apple_relay_transport.mm
         ${CMAKE_SOURCE_DIR}/platform/apple/macos_platform.mm
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
+    )
+endif()
+
+if(IPADOS_PORT OR MACOS_PORT)
+    set_source_files_properties(
+        ${CMAKE_SOURCE_DIR}/platform/apple/apple_relay_transport.mm
+        PROPERTIES COMPILE_FLAGS "-fobjc-arc"
     )
 endif()
 

@@ -15,7 +15,7 @@ Shared today:
 - large-cursor/high-contrast mode, UI scaling, controller support, and
   German/English menus;
 - AVAudioEngine playback, local Gold-CD import, save-file access, and the
-  disabled multiplayer placeholder.
+  shared local/private-room multiplayer protocol and classic match lobby.
 
 Platform-specific integrations remain native: touch, Pencil, safe areas,
 Stage Manager, iPad interruption recovery, Files pickers, AppKit import panels,
@@ -26,7 +26,7 @@ Once the native visionOS target enters the repository, its compile job becomes
 mandatory too. A shared feature then remains incomplete until its behavior is
 implemented or explicitly documented as unavailable on all three platforms.
 
-Multiplayer is designed as one shared deterministic protocol and lobby model
+Multiplayer is implemented as one shared deterministic protocol and lobby model
 with native transports and lifecycle handling. It targets cross-play rather
 than three platform-specific multiplayer forks. See the
 [multiplayer architecture](MULTIPLAYER-CONCEPT.md).

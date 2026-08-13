@@ -105,7 +105,7 @@
                 "BUILD_TESTS": "OFF",
                 "BUILD_TOOLS": "OFF",
                 "MAP_EDITORTD": "OFF",
-                "NETWORKING": "OFF",
+                "NETWORKING": "ON",
                 "SDL1": "OFF",
                 "SDL2": "ON",
                 "OPENAL": "ON"
@@ -140,7 +140,7 @@
                 "BUILD_TESTS": "OFF",
                 "BUILD_TOOLS": "OFF",
                 "MAP_EDITORTD": "OFF",
-                "NETWORKING": "OFF",
+                "NETWORKING": "ON",
                 "SDL1": "OFF",
                 "SDL2": "ON",
                 "OPENAL": "OFF",

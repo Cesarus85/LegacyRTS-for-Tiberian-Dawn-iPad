@@ -19,7 +19,7 @@ legally entitled to use.
 
 [Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad-and-macOS/) · [iPad build guide](README-iPadOS.md) ·
 [macOS build guide](README-macOS.md) · [Apple-platform parity](docs/PLATFORM_PARITY.md) ·
-[Multiplayer plan](docs/MULTIPLAYER-CONCEPT.md) · [Vision Pro plan](docs/VISIONOS-CONCEPT.md) ·
+[Multiplayer guide](docs/MULTIPLAYER.md) · [architecture](docs/MULTIPLAYER-CONCEPT.md) · [Vision Pro plan](docs/VISIONOS-CONCEPT.md) ·
 [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
 ## Gameplay on iPad
@@ -46,11 +46,12 @@ original game data is distributed with this repository.
 - Metal-accelerated SDL rendering
 - Optional modern-art mode for cursor and initial GDI/Nod units
 - AVAudioEngine audio on both platforms, with iPadOS interruption and route handling
+- Two-to-six-player cross-play over a local network or expiring private Internet rooms
 - No analytics, accounts, or advertising
 
 The original campaigns, missions, videos, audio, and languages come from the
-user-supplied game data. Multiplayer is work in progress and planned for a
-later development stage; networking remains disabled in the current build.
+user-supplied game data. Cross-platform multiplayer is enabled as a beta for
+local networks and private Internet rooms; see the [player and operator guide](docs/MULTIPLAYER.md).
 
 ## What this port involved
 
@@ -81,9 +82,8 @@ implemented. The Universal 2 macOS package has been tested from a clean archive
 through local ISO import, videos, menus, mouse input, campaign launch, and a live
 mission. Both remain source-built projects rather than App Store distributions.
 
-The next two major platform projects are now specified rather than merely
-listed: modern cross-platform multiplayer begins with deterministic loopback
-and Apple LAN play before private Internet rooms, while Apple Vision Pro begins
+Cross-platform multiplayer now reuses the original deterministic lockstep
+engine over direct LAN traffic or a bounded private-room TLS relay. Apple Vision Pro begins
 with `Designed for iPad` compatibility before a native visionOS command window
 and optional spatial presentation. See the [multiplayer architecture](docs/MULTIPLAYER-CONCEPT.md)
 and [Vision Pro concept](docs/VISIONOS-CONCEPT.md) for scope, milestones,
@@ -149,8 +149,9 @@ backend as the iPad build. Platform-only differences are documented in the
 
 ## Known limitations
 
-- Multiplayer is designed but not implemented; networking remains disabled
-  until the LAN acceptance gate in the [implementation plan](docs/MULTIPLAYER-CONCEPT.md).
+- Multiplayer is a beta. Local and private Internet play are implemented and
+  compile on both Apple targets, but extended physical-device soak, hostile
+  Wi-Fi, suspend/recovery and maximum-player testing remain release gates.
 - A native visionOS target is planned but not yet enabled. The staged
   [Vision Pro plan](docs/VISIONOS-CONCEPT.md) starts with compatibility testing
   of the existing iPad app and requires physical Vision Pro acceptance before

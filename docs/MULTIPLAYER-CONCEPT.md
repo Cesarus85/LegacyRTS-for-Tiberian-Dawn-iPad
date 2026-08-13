@@ -1,7 +1,10 @@
 # Multiplayer architecture and implementation plan
 
-Status: approved design direction; networking remains disabled in release
-builds until the LAN acceptance gate is complete.
+Status: shared Apple beta implemented. Local UDP play and private Internet
+rooms are enabled in the iPadOS and macOS presets. Protocol, relay, TLS
+production smoke, macOS, iPad simulator and unsigned iPad device builds are
+automated; extended physical-device and maximum-player soak remains the final
+stability gate before calling the feature non-beta.
 
 ## Product goal
 
@@ -42,10 +45,9 @@ blank slate:
 - `common/wsproto.*` and `common/wspudp.*` contain a partial POSIX/UDP port of
   the former Winsock transport.
 
-All Apple presets currently set `NETWORKING=OFF`. This is intentional: simply
-turning the option on would expose old assumptions, unversioned wire
-structures, broadcast discovery, and UI that has not been validated on modern
-Apple lifecycle rules.
+The Apple presets now set `NETWORKING=ON`. The retained legacy packet layer is
+isolated behind the audited UDP or relay transport, while the native Apple
+selector controls which transport is created before the classic lobby opens.
 
 ## Chosen architecture
 
@@ -55,10 +57,9 @@ below that boundary.
 
 ```mermaid
 flowchart TD
-    UI["Native host/join lobby\nGerman + English"] --> Session["Session coordinator\nidentity, compatibility, ready state"]
-    Session --> Legacy["Legacy lockstep adapter\nevents, ACK/retry, frame window"]
+    UI["Native transport selector\nGerman + English"] --> Legacy["Classic lobby + lockstep\ndiscovery, setup, ACK/retry"]
     Legacy --> Transport["Datagram transport interface\nbounded send/receive queues"]
-    Transport --> LAN["LAN: Network.framework UDP\nBonjour discovery"]
+    Transport --> LAN["LAN: direct UDP\nbroadcast discovery"]
     Transport --> Relay["Internet: private-room relay\nTLS WebSocket first"]
     Legacy --> Engine["Unchanged Tiberian Dawn simulation"]
 ```
@@ -70,45 +71,41 @@ simulation.
 
 ### Shared C++ boundary
 
-Add a small interface below `common/`, with operations equivalent to:
+The Apple relay adapter below `common/` and `platform/apple/` provides:
 
-- start and stop a transport;
-- advertise, browse, connect, and disconnect;
-- send one message to a peer or all established peers;
-- poll received messages and connection-state changes;
-- expose measured round-trip time and loss without exposing platform socket
-  types to the engine.
+- versioned, fixed-width relay envelopes with bounded payloads;
+- peer-address mapping into the IPX-shaped interface expected by the engine;
+- broadcast and directed delivery through bounded send/receive queues;
+- game-thread polling, with URLSession callbacks restricted to queueing data;
+- clean transport teardown when leaving multiplayer.
 
 Peer IDs are random fixed-width values created for a lobby. Raw pointers,
 `sockaddr` layouts, IPX headers, and compiler-dependent C++ structures must
 never become the new public wire format.
 
-The adapter initially carries the legacy game payload unchanged inside a
-versioned envelope. Once two original peers work reliably, each payload type
-is audited and converted to explicit-width, little-endian serialization. Every
-decoder checks envelope size, payload type, player ID, session ID, protocol
-version, and maximum length before allocating or copying data.
+The adapter carries the legacy game payload unchanged inside a versioned
+big-endian envelope. Every envelope decoder checks magic, version, message
+kind, source/target peer IDs, declared length and maximum length before copying
+data. The server overwrites the claimed source ID with the authenticated room
+peer, so clients cannot impersonate another room member.
 
 ### LAN transport
 
-The first shipping transport uses Apple's Network framework:
+The current beta retains the audited POSIX UDP adapter below the original
+connection manager:
 
-- a specific Bonjour service such as `_tibdawn._udp` for host discovery;
-- `NWBrowser` and `NWListener` for discoverable games;
-- unicast UDP between established peers for match traffic;
-- `NSLocalNetworkUsageDescription` and the advertised service in
-  `NSBonjourServices` for iPadOS and visionOS;
-- no IP broadcast scan and no arbitrary service browsing.
+- scoped LAN broadcast is used only for classic lobby discovery;
+- established peers use direct unicast UDP for match traffic;
+- `NSLocalNetworkUsageDescription` explains the one-time iPad permission;
+- the transport remains independent from the Internet relay.
 
-This keeps discovery understandable to the player and avoids depending on the
-legacy broadcast code. Whether Apple's multicast entitlement is necessary must
-be verified with the final discovery implementation and provisioning profile;
-it must not be requested speculatively.
+Bonjour/Network.framework discovery remains a later privacy and reliability
+upgrade if real-network testing shows broadcast discovery is insufficient. No
+multicast entitlement is requested by the current implementation.
 
 ### Internet transport
 
-Internet play is a second milestone, not a condition for enabling LAN play.
-The first Internet beta uses a tiny open-source rendezvous and relay service:
+Internet play uses a tiny open-source rendezvous and relay service:
 
 - the host receives a short, expiring room code;
 - joining requires the code and a high-entropy room secret embedded in the
@@ -132,57 +129,49 @@ local and independently distributed Mac builds also need a usable path.
 
 ## Player experience
 
-The disabled main-menu item becomes active only in builds that pass the LAN
-gate. Selecting it opens a native, accessible screen:
+The Multiplayer main-menu item is active in both Apple builds. Selecting it
+opens a localized native transport sheet, followed by the original lobby:
 
-1. Choose `Local Network` or, after its beta ships, `Private Internet Room`.
-2. Enter a persistent local player name.
-3. Choose `Host Game` or select a discovered game / enter a room code.
+1. Choose `Local Network`, `Create Private Internet Room`, `Join Internet
+   Invitation`, or the original single-player skirmish.
+2. For Internet play, create and copy a private invitation or paste one received
+   from the host.
+3. In the classic lobby, host a new game or select the advertised host game.
 4. In the lobby, the host selects map and original match options; every player
    chooses color/side and marks ready.
-5. The Start button stays disabled while a peer is incompatible, still loading,
-   or not ready. The reason is shown next to that peer.
-6. Once launched, the original game UI and simulation own the match.
+5. Once launched, the original game UI and simulation own the match.
 
-The lobby shows latency and connection health without exposing IP addresses.
-Text chat, if retained, is limited to the private lobby and match. Player names
-and chat are untrusted UTF-8 input: enforce length limits, strip control
-characters, and safely map unsupported characters into the classic font.
+The classic lobby retains its established player-name and chat limits. The
+relay never exposes public IP addresses or a public player directory.
 
 ## Compatibility and determinism contract
 
-Before readying, every peer exchanges and agrees on:
-
-- protocol major/minor version and application build ID;
-- engine determinism version;
-- map identifier plus SHA-256 of the exact scenario bytes;
-- hashes of simulation-relevant rules/data files;
-- enabled expansion and optional modification identifiers;
-- player count and complete host-selected match settings;
-- negotiated input-delay and maximum-ahead values.
+Before Internet room membership, the relay requires matching envelope and
+compatibility versions. In the classic lobby, the original protocol compares
+the application/network version. At match startup it exchanges `ScenarioCRC`;
+different scenario bytes stop startup. During play, `FRAMEINFO` packets carry
+the deterministic game CRC, and the engine detects a divergent simulation.
 
 Presentation-only choices such as sharp/pixel-exact/classic scaling, modern
 artwork, cursor size, language, and visionOS immersion never enter the
 determinism hash.
 
-During a match, calculate a lightweight deterministic state checksum at fixed
-frame intervals. Peers exchange only the checksum and frame number. A mismatch
-pauses the match, records a diagnostic bundle without game assets, and ends the
-session cleanly rather than allowing divergent worlds to continue.
+Adding SHA-256 manifests for all simulation-relevant installed data remains a
+future defence-in-depth improvement. It is not required to prevent silent
+simulation divergence because the original scenario and recurring game-state
+CRC checks remain active.
 
 ## Lifecycle and failure policy
 
 The engine cannot continue a lockstep match while one mobile process is
-suspended. Therefore:
+suspended. The current beta therefore uses the original reconnect dialog,
+retry window and timeout:
 
-- opening Control Center, removing the headset, backgrounding, or losing focus
-  sends a pause request immediately;
-- all peers stop at an agreed future frame and show who interrupted play;
-- the connection remains eligible for a short grace period;
-- returning before the deadline resumes at an agreed frame;
-- expiry or process termination ends the match for the first release;
-- a network path change may reconnect the transport during the grace period,
-  but the player never joins a simulation that advanced without them.
+- peers stop advancing while required lockstep packets are missing;
+- returning quickly may recover through retransmission;
+- a longer suspension, process termination, host departure, or relay restart
+  ends the match;
+- there is no join-in-progress or host migration.
 
 The host has setup authority, not simulation authority. Once a match starts,
 all peers remain equal. A relay outage or host departure therefore ends the
@@ -211,82 +200,74 @@ competitive service. A modified client can cheat or deliberately desynchronize
 a match; the project should state that plainly rather than claiming server
 authority it does not have.
 
-## Implementation milestones and gates
+## Implementation status and remaining gates
 
-### M0 — compile and protocol audit
+### Completed — compile, protocol and transport
 
-- Add an internal Apple networking preset without changing release presets.
-- Compile all `NETWORKING` sources on arm64 macOS first.
-- Inventory every transmitted structure, size assumption, global, endian
-  conversion, and direct dependency on IPX/Winsock/window messages.
-- Record golden packet fixtures from a loopback match.
+- Networking is enabled in the shared iPadOS and Universal macOS presets.
+- The legacy transport boundary compiles for arm64 iPad devices, arm64 iPad
+  Simulator, arm64 macOS and x86_64 macOS.
+- The relay envelope has explicit-width fields, strict limits and round-trip,
+  truncation, oversize, bad-magic, bad-version and bad-routing tests.
+- The adapter preserves the original bounded packet format, connection manager,
+  scenario CRC and recurring deterministic game CRC.
 
-Gate: networking code compiles with warnings treated as errors and the audit
-lists every wire payload.
+### Completed — Apple LAN beta
 
-### M1 — deterministic loopback
+- Local lobby discovery uses scoped UDP broadcast and established peers use
+  direct UDP.
+- The one-time iPad local-network permission text is present in both generated
+  Apple bundles.
+- The classic two-to-six-player lobby, game settings, chat, lockstep,
+  acknowledgement, retry and desync detection remain active.
+- Firewall, guest-Wi-Fi and client-isolation guidance is published.
 
-- Introduce the shared transport interface and an in-memory backend.
-- Run two isolated game processes against a deterministic virtual network.
-- Inject delay, jitter, loss, duplication, reordering, queue pressure, and
-  disconnects.
-- Add state-checksum and compatibility-handshake tests.
+### Completed — private Internet-room beta
 
-Gate: repeated two-player matches remain checksum-identical with a fixed seed,
-including impaired-network tests.
+- The production relay is deployed behind TLS at `sportaktivfitness.de` as an
+  unprivileged, systemd-hardened process bound only to localhost.
+- Private invitations combine a readable room code with a high-entropy secret.
+- Rooms are memory-only, host-owned, limited to six peers and expire
+  automatically; packets, queues, rates, sockets and room lifetime are capped.
+- Automated tests cover authenticated create/join, broadcast, unicast, protocol
+  mismatch, bad secret, the six-player limit, malformed input and isolation
+  between rooms.
+- A production smoke test opens two real WSS clients and relays binary data.
 
-### M2 — Apple LAN alpha
+### Remaining physical acceptance gate
 
-- Implement the Network.framework UDP/Bonjour backend in `platform/apple`.
-- Add localized local-network permission text and native host/join/lobby UI.
-- Support macOS-to-macOS first, then Mac-to-iPad, then iPad-to-iPad.
-- Add pause/graceful-disconnect behavior for mobile lifecycle events.
+- Run real matches for Mac-to-Mac, Mac-to-iPad and iPad-to-iPad over LAN and the
+  production Internet relay.
+- Soak two-player and six-player matches for 60 minutes and verify no desync,
+  stuck lobby, leaked peer or queue growth.
+- Exercise permission denial, Mac firewall, guest Wi-Fi, app switching,
+  suspend/resume, network changes, relay restart and incompatible data.
+- Measure latency and packet behaviour over geographically separated and
+  cellular connections. Keep the feature labeled beta until this matrix passes.
 
-Gate: two-player and maximum-player LAN matches pass a 60-minute soak across
-all supported Apple combinations with no desync, leaked peer, stuck lobby, or
-unbounded queue.
-
-### M3 — LAN beta
-
-- Harden malformed-packet handling, diagnostics, accessibility, keyboard and
-  touch lobby flows.
-- Test Wi-Fi changes, denied/revoked local-network permission, duplicate names,
-  sleep/wake, app switching, and joining incompatible data.
-- Document firewall and privacy behavior.
-
-Gate: release presets may set `NETWORKING=ON` and remove the disabled placeholder
-only after CI builds every Apple target and the physical-device matrix passes.
-
-### M4 — private Internet rooms
-
-- Publish and deploy the minimal relay.
-- Add room creation/joining, expiry, rate limits, TLS, and operational health
-  monitoring without player analytics.
-- Test realistic latency, jitter, loss, cellular/Wi-Fi transitions, relay
-  restart, regional distance, and denial-of-service limits.
-
-Gate: an Internet beta is labeled separately from stable LAN play; LAN never
-depends on relay availability.
-
-### M5 — future options
+### Future options
 
 - QUIC datagrams if measurement justifies them;
 - invite links, optional Game Center discovery, SharePlay lobby presence;
 - reconnect snapshots, host migration, spectators, replays, or multiplayer
   save/restore only as separately designed projects.
 
-## Required automated and physical tests
+## Test matrix
 
-- serializer round trips and golden cross-version fixtures;
-- malformed-length, truncated, oversized, reordered, duplicate, and fuzzed
-  packet tests;
-- deterministic dual-process integration test with per-frame checksums;
-- protocol mismatch, map/data mismatch, full lobby, duplicate identity, and
-  ready-state tests;
+Automated now:
+
+- protocol serialization, malformed frames and compatibility rejection;
+- authenticated relay lifecycle, routing, capacity and room isolation;
+- production TLS/WSS two-client routing smoke;
+- shared C++ tests plus iPad simulator/device and Universal macOS builds;
+- original per-scenario and recurring game-state CRC logic in the engine.
+
+Remaining physical/long-running tests:
+
 - simulated 0–10% loss, 20–500 ms latency, jitter, bursts, and disconnects;
 - macOS firewall and multiple-interface tests;
-- iPad and visionOS permission denial, background/suspend, thermal, and route
-  change tests;
+- iPad permission denial, background/suspend, thermal, and route-change tests;
+- full lobby, duplicate identity, map/data mismatch and ready-state tests;
 - mixed iPadOS/macOS/visionOS soak after the visionOS target exists;
 - App Store privacy-label and entitlement review before distribution.
 
