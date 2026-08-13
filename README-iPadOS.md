@@ -41,14 +41,28 @@ Identifier if Xcode requests one. Select the connected iPad and press Run.
 The remaining commands in this document are for contributors and repeat-build
 automation. Normal users do not need to create a CMake signing preset.
 
-## Contributor workflow for the canonical physical-iPad project
+## Contributor workflow: simulator plus physical iPad
 
-The physical iPad build is the canonical development and acceptance target.
-All new work must be built and verified with `ipados-device` on real hardware.
-The simulator preset remains in the repository only as an unused legacy
-fallback and is not part of the normal workflow.
+The simulator is the fast day-to-day development target and the physical iPad
+is the canonical acceptance target. They use separate generated projects and
+can be kept side by side. Use the simulator for layout, menus, gameplay logic,
+localization, save handling, and most graphics/audio iteration. Verify direct
+touch, Pencil, performance, audio interruptions, lifecycle behavior, and every
+release candidate with `ipados-device` on real hardware.
 
-Copy the private user-preset template once:
+Configure and open the simulator project with:
+
+```sh
+cmake --preset ipados-simulator
+cmake --build --preset ipados-simulator
+open build/ipados-simulator/TiberianDawnApple.xcodeproj
+```
+
+Select the `TiberianDawn` scheme and an iPad simulator. Simulator and physical
+iPad have independent app containers, so game data and saves imported into one
+are not automatically present in the other.
+
+For the physical-device project, copy the private user-preset template once:
 
 ```sh
 cp resources/CMakeUserPresets.json.example CMakeUserPresets.json

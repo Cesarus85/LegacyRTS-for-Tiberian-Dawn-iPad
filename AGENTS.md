@@ -16,5 +16,9 @@ the same functional level whenever the operating systems permit it.
 - Never publish or merge a release-facing change after testing only one Apple
   target. Run the host tests, unsigned iPadOS compile, and Universal 2 macOS
   package verification.
+- Use `ipados-simulator` for fast day-to-day iteration when a physical iPad is
+  unavailable. Keep its generated project separate from `ipados-device`, and
+  still validate touch, Pencil, performance, audio interruptions, lifecycle,
+  and release candidates on a physical iPad before declaring work complete.
 - Keep shared Apple resources below `resources/apple`; do not create divergent
   iPad and Mac copies of the same artwork.
