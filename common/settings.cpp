@@ -25,11 +25,16 @@ SettingsClass::SettingsClass()
     /*
     ** Video settings
     */
-    Video.WindowWidth = 640;
-    Video.WindowHeight = 400;
 #ifdef MACOS_PORT
+    // Start large enough to be comfortable on a modern Mac while retaining
+    // the game's native 16:10 aspect ratio. Set_Video_Mode clamps this to the
+    // usable display area on smaller screens.
+    Video.WindowWidth = 1200;
+    Video.WindowHeight = 750;
     Video.Windowed = true;
 #else
+    Video.WindowWidth = 640;
+    Video.WindowHeight = 400;
     Video.Windowed = false;
 #endif
     Video.Width = 0;
@@ -77,6 +82,14 @@ void SettingsClass::Load(INIClass& ini)
     */
     Video.WindowWidth = ini.Get_Int("Video", "WindowWidth", Video.WindowWidth);
     Video.WindowHeight = ini.Get_Int("Video", "WindowHeight", Video.WindowHeight);
+#ifdef MACOS_PORT
+    // Migrate the original port's fixed first-run size. That build ignored
+    // the saved window dimensions and always opened at 640x400 points.
+    if (Video.WindowWidth == 640 && Video.WindowHeight == 400) {
+        Video.WindowWidth = 1200;
+        Video.WindowHeight = 750;
+    }
+#endif
     Video.Windowed = ini.Get_Bool("Video", "Windowed", Video.Windowed);
     Video.Boxing = ini.Get_Bool("Video", "Boxing", Video.Boxing);
     Video.BoxingAspectRatio = ini.Get_String("Video", "BoxingAspectRatio", Video.BoxingAspectRatio);
