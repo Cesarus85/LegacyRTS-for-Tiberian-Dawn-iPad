@@ -16,11 +16,15 @@
 
   const buttons = document.querySelectorAll('[data-language]');
   const translatable = document.querySelectorAll('[data-de][data-en]');
+  const translatedImages = document.querySelectorAll('[data-alt-de][data-alt-en]');
 
   function setLanguage(language) {
     document.documentElement.lang = language;
     translatable.forEach((element) => {
       element.textContent = element.dataset[language];
+    });
+    translatedImages.forEach((image) => {
+      image.alt = image.dataset[`alt${language === 'de' ? 'De' : 'En'}`];
     });
     buttons.forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.language === language));
