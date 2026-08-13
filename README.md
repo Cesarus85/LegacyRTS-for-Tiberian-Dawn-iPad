@@ -104,6 +104,11 @@ under Signing & Capabilities, select the connected iPad, and press Run. The
 detailed [iPadOS guide](README-iPadOS.md) also covers the manual developer
 workflow, first launch, data import, controls, storage, and diagnostics.
 
+Contributors may additionally use the separate `ipados-simulator` preset for
+fast iteration without a connected device. Simulator and device builds coexist;
+physical-iPad validation remains required for hardware-specific behavior and
+release candidates.
+
 ## Game-data import
 
 On first launch, choose the original C&C Gold **GDI and Nod ISO files together**
