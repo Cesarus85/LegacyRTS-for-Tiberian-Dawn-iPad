@@ -66,8 +66,10 @@ void Set_Video_Cursor_Clip(bool clipped);
 void Move_Video_Mouse(float xrel, float yrel);
 void Get_Video_Mouse(int& x, int& y);
 void Refresh_Video_Layout();
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 void Set_Video_Mouse_Window(float window_x, float window_y, int& game_x, int& game_y);
+#endif
+#ifdef IPADOS_PORT
 void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& game_x, int& game_y);
 void Set_Video_Render_Active(bool active);
 void Video_Record_Input_Timestamp(uint32_t timestamp_ms);

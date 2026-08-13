@@ -16,7 +16,8 @@ This checklist is for maintainers preparing a public source release.
 ## Quality
 
 - [ ] Host tests pass.
-- [ ] The macOS portability build compiles.
+- [ ] The Universal 2 macOS package builds and its extracted app passes
+      architecture, runtime-link, and code-signature checks.
 - [ ] The Release device configuration builds and signs.
 - [ ] A clean install imports both Gold discs and reaches a live mission.
 - [ ] Touch selection, pause/resume, recovery save, audio interruption, and

@@ -462,6 +462,8 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     Settings.Video.Windowed = true;
     Settings.Mouse.RawInput = false;
     win_flags = SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+#elif defined(MACOS_PORT)
+    win_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 #else
     if (!Settings.Video.Windowed) {
         /*
@@ -485,8 +487,13 @@ bool Set_Video_Mode(int w, int h, int bits_per_pixel)
     }
 #endif
 
-    window =
-        SDL_CreateWindow("Vanilla Conquer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, win_w, win_h, win_flags);
+    const char* window_title =
+#ifdef MACOS_PORT
+        "Tiberian Dawn";
+#else
+        "Vanilla Conquer";
+#endif
+    window = SDL_CreateWindow(window_title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, win_w, win_h, win_flags);
     if (window == nullptr) {
         DBG_ERROR("SDL_CreateWindow failed: %s", SDL_GetError());
         Reset_Video_Mode();
@@ -726,7 +733,7 @@ void Get_Video_Mouse(int& x, int& y)
         int window_x = 0;
         int window_y = 0;
         SDL_GetMouseState(&window_x, &window_y);
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
         Set_Video_Mouse_Window(window_x, window_y, x, y);
 #else
         x = window_x / hwcursor.ScaleX;
@@ -735,7 +742,7 @@ void Get_Video_Mouse(int& x, int& y)
     }
 }
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 static void Set_Video_Mouse_Output(float pixel_x, float pixel_y, int& game_x, int& game_y)
 {
     const float scale_x = render_dst.w > 0 ? render_dst.w / static_cast<float>(hwcursor.GameW) : 1.0f;
@@ -760,6 +767,7 @@ void Set_Video_Mouse_Window(float window_x, float window_y, int& game_x, int& ga
     Set_Video_Mouse_Output(pixel_x, pixel_y, game_x, game_y);
 }
 
+#ifdef IPADOS_PORT
 void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& game_x, int& game_y)
 {
     if (renderer_output_w <= 0 || renderer_output_h <= 0) {
@@ -768,6 +776,7 @@ void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& gam
 
     Set_Video_Mouse_Output(normalized_x * renderer_output_w, normalized_y * renderer_output_h, game_x, game_y);
 }
+#endif
 #endif
 
 /***********************************************************************************************

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible Tiberian Dawn for iPad problem without sharing original game data
+description: Report a reproducible iPadOS or macOS problem without sharing original game data
 title: "[Bug]: "
 labels: [bug]
 body:
@@ -13,7 +13,7 @@ body:
       label: Platform
       options:
         - Physical iPad
-        - macOS portability build
+        - macOS 11+ native app
         - Other host/test build
     validations:
       required: true

@@ -40,7 +40,7 @@
 #include "common/utfargs.h"
 #include "settings.h"
 
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #include <SDL.h>
 #endif
 
@@ -545,12 +545,16 @@ void Prog_End(const char* why, bool fatal) // Added why and fatal parameters. ST
         GlyphX_Debug_Print(why);
     }
     if (fatal) {
-#ifdef IPADOS_PORT
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
         SDL_ShowSimpleMessageBox(
             SDL_MESSAGEBOX_ERROR,
+#ifdef IPADOS_PORT
             "Tiberian Dawn for iPad - Missing Game Data",
+#else
+            "Tiberian Dawn for macOS - Missing Game Data",
+#endif
             "The required Command & Conquer data files are missing or incomplete.\n\n"
-            "Copy them to On My iPad/Tiberian Dawn for iPad/TiberianDawnForiPad/vanillatd and restart the app.",
+            "Restart the app to open the guided import.",
             nullptr);
 #else
         *((int*)0) = 0;

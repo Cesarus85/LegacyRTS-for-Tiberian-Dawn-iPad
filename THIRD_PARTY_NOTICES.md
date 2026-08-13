@@ -1,7 +1,7 @@
 # Third-party notices
 
-Tiberian Dawn for iPad incorporates or builds upon the following open-source projects.
-Their names do not imply endorsement.
+Tiberian Dawn for iPad and macOS incorporates or builds upon the following
+open-source projects. Their names do not imply endorsement.
 
 ## Vanilla Conquer and Electronic Arts source
 

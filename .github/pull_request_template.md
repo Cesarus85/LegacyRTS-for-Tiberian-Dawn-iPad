@@ -5,7 +5,7 @@ What does this change and why?
 ## Validation
 
 - [ ] Host tests
-- [ ] macOS portability build, if shared code changed
+- [ ] Universal 2 macOS app build, if shared or macOS code changed
 - [ ] Physical iPad Debug build, if iPad code changed
 - [ ] Physical iPad Release build, if release behavior changed
 

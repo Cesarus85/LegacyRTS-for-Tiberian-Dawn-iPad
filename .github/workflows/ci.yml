@@ -23,8 +23,12 @@ jobs:
       - name: Check safe Xcode starter
         run: |
           sh -n "Open Tiberian Dawn for iPad.command"
+          sh -n "Build Tiberian Dawn for macOS.command"
+          sh -n scripts/package-macos-app.sh
           script_commit=$(sed -n 's/^sdl_commit="\([0-9a-f]*\)"/\1/p' "Open Tiberian Dawn for iPad.command")
           test "$script_commit" = "$(git rev-parse HEAD:third_party/SDL2)"
+          mac_script_commit=$(sed -n 's/^sdl_commit="\([0-9a-f]*\)"/\1/p' "Build Tiberian Dawn for macOS.command")
+          test "$mac_script_commit" = "$(git rev-parse HEAD:third_party/SDL2)"
 
   host-tests:
     runs-on: macos-15
@@ -52,3 +56,28 @@ jobs:
           -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
       - name: Compile unsigned iPad target
         run: cmake --build --preset ipados-device -- -quiet CODE_SIGNING_ALLOWED=NO
+
+  macos-app-compile:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install CMake
+        run: brew install cmake
+      - name: Build portable Universal 2 app
+        run: ./scripts/package-macos-app.sh
+      - name: Verify clean archive
+        run: |
+          unpacked="$RUNNER_TEMP/tiberian-dawn-macos"
+          mkdir -p "$unpacked"
+          ditto -x -k dist/Tiberian-Dawn-macOS-universal.zip "$unpacked"
+          app="$unpacked/Tiberian Dawn.app"
+          executable="$app/Contents/MacOS/Tiberian Dawn"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          architectures=$(lipo -archs "$executable")
+          [[ " $architectures " == *" arm64 "* ]]
+          [[ " $architectures " == *" x86_64 "* ]]
+          ! otool -L "$executable" | grep -E '/opt/homebrew|/usr/local'
+          test -z "$(find "$app" -type f \( -iname '*.iso' -o -iname '*.mix' -o -iname '*.vqa' -o -iname '*.aud' \) -print -quit)"

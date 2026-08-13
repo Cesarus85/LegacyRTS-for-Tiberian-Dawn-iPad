@@ -18,6 +18,8 @@
 
 #ifdef IPADOS_PORT
 #include "../platform/apple/ipados_platform.h"
+#elif defined(MACOS_PORT)
+#include "../platform/apple/macos_platform.h"
 #endif
 
 #ifdef _WIN32
@@ -40,6 +42,11 @@ void PathsClass::Init(const char* suffix, const char* ini_name, const char* data
         // The engine cannot present a useful screen without original data.
         // A later first-run choice therefore ends cleanly and the guide is
         // shown again on the next launch.
+        exit(EXIT_SUCCESS);
+    }
+#elif defined(MACOS_PORT)
+    if (!TiberianDawnForMac_PrepareGameData()) {
+        DBG_WARN("macOS game-data preparation was cancelled or failed");
         exit(EXIT_SUCCESS);
     }
 #endif

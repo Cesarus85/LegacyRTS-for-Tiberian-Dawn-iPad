@@ -121,6 +121,32 @@
                 "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnForiPad-iPad-Device-Products",
                 "IPADOS_BUNDLE_IDENTIFIER": "org.tiberiandawn.ipad"
             }
+        },
+        {
+            "name": "macos-universal",
+            "displayName": "Tiberian Dawn for macOS — Universal App",
+            "generator": "Xcode",
+            "binaryDir": "${sourceDir}/build/macos-universal",
+            "cacheVariables": {
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+                "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
+                "CMAKE_FIND_FRAMEWORK": "FIRST",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED": "NO",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED": "NO",
+                "BUILD_VANILLATD": "ON",
+                "BUILD_VANILLARA": "OFF",
+                "BUILD_REMASTERTD": "OFF",
+                "BUILD_REMASTERRA": "OFF",
+                "BUILD_TESTS": "OFF",
+                "BUILD_TOOLS": "OFF",
+                "MAP_EDITORTD": "OFF",
+                "NETWORKING": "OFF",
+                "SDL1": "OFF",
+                "SDL2": "ON",
+                "OPENAL": "ON",
+                "MACOS_PORT": "ON",
+                "MAKE_BUNDLE": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -177,6 +203,13 @@
             "name": "ipados-device-release",
             "configurePreset": "ipados-device",
             "displayName": "Tiberian Dawn for iPad — Release",
+            "configuration": "Release",
+            "targets": ["TiberianDawn"]
+        },
+        {
+            "name": "macos-universal",
+            "configurePreset": "macos-universal",
+            "displayName": "Tiberian Dawn for macOS — Universal Release",
             "configuration": "Release",
             "targets": ["TiberianDawn"]
         }
@@ -262,6 +295,19 @@
                 {
                     "type": "build",
                     "name": "nonet"
+                }
+            ]
+        },
+        {
+            "name": "macos-universal",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "macos-universal"
+                },
+                {
+                    "type": "build",
+                    "name": "macos-universal"
                 }
             ]
         }

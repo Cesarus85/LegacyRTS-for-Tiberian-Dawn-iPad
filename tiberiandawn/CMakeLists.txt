@@ -132,6 +132,12 @@ if(IPADOS_PORT)
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
     )
+elseif(MACOS_PORT)
+    list(APPEND TIBDAWN_SRC
+        ${CMAKE_SOURCE_DIR}/platform/apple/macos_platform.mm
+        ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
+        ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
+    )
 endif()
 
 if(NETWORKING)
@@ -269,13 +275,34 @@ if(BUILD_VANILLATD)
                     XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
                 )
             endif()
+        elseif(MACOS_PORT)
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/macos/Assets.xcassets
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources
+            )
+            target_sources(TiberianDawn PRIVATE
+                ${CMAKE_SOURCE_DIR}/resources/macos/Assets.xcassets
+            )
+            set_target_properties(TiberianDawn PROPERTIES
+                MACOSX_BUNDLE_GUI_IDENTIFIER "org.tiberiandawn.macos"
+                MACOSX_BUNDLE_BUNDLE_NAME "Tiberian Dawn"
+                MACOSX_BUNDLE_ICON_FILE "AppIcon.icns"
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/platform/apple/Info-macOS.plist.in"
+                XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.tiberiandawn.macos"
+                XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+            )
+            target_link_libraries(TiberianDawn "-framework AppKit" "-framework UniformTypeIdentifiers")
         endif()
     endif()
 
     target_compile_definitions(TiberianDawn PUBLIC $<$<CONFIG:Debug>:_DEBUG> ${VANILLA_DEFS} MEGAMAPS)
     target_include_directories(TiberianDawn PUBLIC ${CMAKE_SOURCE_DIR} .)
     target_link_libraries(TiberianDawn commonv ${VANILLA_LIBS} ${STATIC_LIBS})
-    set_target_properties(TiberianDawn PROPERTIES OUTPUT_NAME TiberianDawn)
+    if(MACOS_PORT)
+        set_target_properties(TiberianDawn PROPERTIES OUTPUT_NAME "Tiberian Dawn")
+    else()
+        set_target_properties(TiberianDawn PROPERTIES OUTPUT_NAME TiberianDawn)
+    endif()
     if(MAP_EDITORTD)
         target_compile_definitions(TiberianDawn PUBLIC INTERNAL_VERSION)
     endif()

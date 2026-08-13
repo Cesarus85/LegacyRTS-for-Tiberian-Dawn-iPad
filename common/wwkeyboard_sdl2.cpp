@@ -522,18 +522,22 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
             Queue_Text_Input(*this, event.text.text);
             break;
 #endif
-        case SDL_MOUSEMOTION:
+        case SDL_MOUSEMOTION: {
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #ifdef IPADOS_PORT
             Video_Record_Input_Timestamp(event.motion.timestamp);
             if (!Is_Gamepad_Active()) {
+#endif
                 int x = 0;
                 int y = 0;
                 Set_Video_Mouse_Window(event.motion.x, event.motion.y, x, y);
+#ifdef IPADOS_PORT
             }
+#endif
 #else
             Move_Video_Mouse(static_cast<float>(event.motion.xrel), static_cast<float>(event.motion.yrel));
 #endif
-            break;
+        } break;
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP: {
             int x, y;
@@ -551,8 +555,10 @@ void WWKeyboardClassSDL2::Fill_Buffer_From_System(void)
                 break;
             }
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #ifdef IPADOS_PORT
             Video_Record_Input_Timestamp(event.button.timestamp);
+#endif
             Set_Video_Mouse_Window(event.button.x, event.button.y, x, y);
 #else
             if (Settings.Mouse.RawInput || Is_Gamepad_Active()) {

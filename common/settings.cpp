@@ -10,7 +10,13 @@ SettingsClass::SettingsClass()
     /*
     ** Mouse settings
     */
+#ifdef MACOS_PORT
+    // Absolute Cocoa coordinates are predictable in Retina/resizable windows
+    // and do not trap the pointer on first launch.
+    Mouse.RawInput = false;
+#else
     Mouse.RawInput = true;
+#endif
     Mouse.Sensitivity = 100;
     Mouse.ControllerEnabled = false;
     Mouse.ControllerPointerSpeed = 10;
@@ -21,7 +27,11 @@ SettingsClass::SettingsClass()
     */
     Video.WindowWidth = 640;
     Video.WindowHeight = 400;
+#ifdef MACOS_PORT
+    Video.Windowed = true;
+#else
     Video.Windowed = false;
+#endif
     Video.Width = 0;
     Video.Height = 0;
     Video.Boxing = true;

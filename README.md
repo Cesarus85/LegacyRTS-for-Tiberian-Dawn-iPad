@@ -1,13 +1,13 @@
-# Tiberian Dawn for iPad
+# Tiberian Dawn for iPad and macOS
 
 > **EA has not endorsed and does not support this product.**
 
-**Command & Conquer: Tiberian Dawn (1995), running natively on iPadOS** through
-an unofficial, community-made engine port. Tiberian Dawn for iPad is based on
+**Command & Conquer: Tiberian Dawn (1995), running natively on iPadOS and
+macOS** through an unofficial, community-made engine port. The project is based on
 [Vanilla Conquer](https://github.com/TheAssemblyArmada/Vanilla-Conquer) and the
 source code released by Electronic Arts.
 
-> **Independent modified project.** Tiberian Dawn for iPad is not an Electronic
+> **Independent modified project.** Tiberian Dawn for iPad and macOS is not an Electronic
 > Arts product and is not affiliated with Electronic Arts. Command & Conquer
 > and related names are Electronic Arts trademarks. They are used in plain text
 > only to identify the game this port is for and the data it is compatible with.
@@ -17,14 +17,14 @@ It does not contain the game, disc images, or any original data files needed to
 run it. You must supply data from C&C Gold GDI and Nod discs that you are
 legally entitled to use.
 
-[Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad/) · [iPad build guide](README-iPadOS.md) ·
-[Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
+[Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad-and-macOS/) · [iPad build guide](README-iPadOS.md) ·
+[macOS build guide](README-macOS.md) · [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
 ## Gameplay on iPad
 
-[![Tiberian Dawn running on an iPad](docs/assets/tiberian-dawn-ipad-gameplay.jpg)](https://cesarus85.github.io/Tiberian-Dawn-for-iPad/#gameplay)
+[![Tiberian Dawn running on an iPad](docs/assets/tiberian-dawn-ipad-gameplay.jpg)](https://cesarus85.github.io/Tiberian-Dawn-for-iPad-and-macOS/#gameplay)
 
-[Watch the 63-second gameplay video](https://cesarus85.github.io/Tiberian-Dawn-for-iPad/#gameplay),
+[Watch the 63-second gameplay video](https://cesarus85.github.io/Tiberian-Dawn-for-iPad-and-macOS/#gameplay),
 including launch, menus, a mission briefing, and touch-driven gameplay on a
 physical iPad. The preview uses game data supplied by the device owner; no
 original game data is distributed with this repository.
@@ -35,6 +35,8 @@ original game data is distributed with this repository.
 - Touch-first RTS controls, mouse and trackpad, hardware keyboard, controllers,
   and Apple Pencil support
 - Guided on-device import of the GDI and Nod C&C Gold disc images
+- Self-contained Universal 2 macOS app for Apple Silicon and Intel, with a
+  guided local two-disc importer and no Homebrew runtime dependency
 - Files-visible manual saves plus transactional interruption recovery
 - 60 FPS presentation with a persistent 30 FPS battery mode
 - Built-in resolution and presentation scaler with full-size sharp and integer
@@ -72,8 +74,9 @@ diagnostics, documentation, and repetitive validation were AI-assisted.
 The physical-iPad build starts, imports complete C&C Gold GDI and Nod data,
 plays campaigns and live missions, saves and resumes, rotates, and works in
 Stage Manager. Touch, Pencil, mouse/trackpad, keyboard, and controller paths are
-implemented. The app remains a source-built development project rather than an
-App Store or pre-signed IPA distribution.
+implemented. The Universal 2 macOS package has been tested from a clean archive
+through local ISO import, videos, menus, mouse input, campaign launch, and a live
+mission. Both remain source-built projects rather than App Store distributions.
 
 ## Open in Xcode and run on a physical iPad
 
@@ -110,23 +113,26 @@ The importer does not support data from the Remastered Collection, The First
 Decade, or The Ultimate Collection. No game data may be submitted to this
 repository in issues, pull requests, test fixtures, or releases.
 
-## macOS status
+## Build and run on macOS
 
-The upstream desktop path remains available and is checked for macOS build
-portability. It is separate from the primary iPad product: the native iPad
-importer, Files integration, touch controls, and iPad lifecycle are compiled
-only for iPadOS. A portable macOS app also needs its SDL2 and OpenAL dynamic
-libraries bundled and should not be advertised as a supported release until it
-has completed a launch and gameplay smoke test.
+The supported macOS source build produces a self-contained Universal 2 app for
+Apple Silicon and Intel Macs running macOS 11 or newer. Double-click `Build
+Tiberian Dawn for macOS.command`; it verifies Xcode, CMake, and the pinned SDL2
+source, then creates `dist/Tiberian-Dawn-macOS-universal.zip`. Unzip it and open
+`Tiberian Dawn.app`. No Homebrew libraries, administrator access, Apple account,
+or original game files are used during compilation.
+
+On first launch, the bilingual importer accepts the GDI and Nod Gold ISOs either
+together or one after the other. See the complete [macOS guide](README-macOS.md)
+for paths, signing details, and the manual build command.
 
 ## Known limitations
 
 - Multiplayer is work in progress for a later development stage; networking is
   disabled in the current build.
-- Red Alert is present in the upstream source tree but is not an iPad target.
+- Red Alert is present in the upstream source tree but is not a supported Apple
+  app target in this project.
 - External-display behavior is not release-tested.
-- The macOS target compiles, but portable packaging and live gameplay still
-  need explicit release validation.
 - Original game limitations and content are unchanged; this project does not
   provide replacement assets or translations.
 
@@ -139,8 +145,8 @@ has completed a launch and gameplay smoke test.
 - SDL contributors — platform, rendering, and input foundation
 - unshieldv3 contributors — InstallShield archive extraction used by the guided
   importer
-- Tiberian Dawn for iPad contributors — iPadOS integration, controls, importer,
-  lifecycle, storage, performance, and documentation
+- Tiberian Dawn for iPad and macOS contributors — Apple integration, controls,
+  importer, lifecycle, storage, performance, and documentation
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for license details.
 

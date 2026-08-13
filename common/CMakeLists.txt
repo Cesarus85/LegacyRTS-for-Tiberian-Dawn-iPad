@@ -180,6 +180,9 @@ if(IPADOS_PORT)
 else()
     target_compile_features(common PUBLIC cxx_std_11)
 endif()
+if(MACOS_PORT)
+    target_compile_definitions(common PRIVATE MACOS_PORT)
+endif()
 # Make build check state of git to check for uncommitted changes.
 add_dependencies(common check_git)
 
