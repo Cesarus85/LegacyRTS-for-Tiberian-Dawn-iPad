@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "visionOS" AND CMAKE_VERSION VERSION_LESS 3.28)
+    message(FATAL_ERROR "The native visionOS target requires CMake 3.28 or newer.")
+endif()
+
 # Allow passing search paths from environment.
 foreach(_path_elem $ENV{CMAKE_FIND_ROOT_PATH})
     if(NOT IS_ABSOLUTE ${_path_elem})
@@ -52,17 +56,40 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 else()
     option(IPADOS_PORT "Build the iPadOS port." OFF)
 endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+    option(VISIONOS_PORT "Build the native visionOS prototype." ON)
+else()
+    option(VISIONOS_PORT "Build the native visionOS prototype." OFF)
+endif()
 set(IPADOS_BUNDLE_IDENTIFIER "org.tiberiandawn.ipad" CACHE STRING "Bundle identifier for the iPadOS application")
 set(IPADOS_DEVELOPMENT_TEAM "" CACHE STRING "Apple development team used to sign the iPadOS application")
+set(VISIONOS_BUNDLE_IDENTIFIER "org.tiberiandawn.visionos" CACHE STRING "Bundle identifier for the visionOS application")
+set(VISIONOS_DEVELOPMENT_TEAM "" CACHE STRING "Apple development team used to sign the visionOS application")
+
+if((IPADOS_PORT AND MACOS_PORT) OR (IPADOS_PORT AND VISIONOS_PORT) OR (MACOS_PORT AND VISIONOS_PORT))
+    message(FATAL_ERROR "IPADOS_PORT, MACOS_PORT, and VISIONOS_PORT are mutually exclusive.")
+endif()
+
+set(APPLE_NATIVE_PORT OFF)
+if(IPADOS_PORT OR MACOS_PORT OR VISIONOS_PORT)
+    set(APPLE_NATIVE_PORT ON)
+endif()
+set(APPLE_UIKIT_PORT OFF)
+if(IPADOS_PORT OR VISIONOS_PORT)
+    set(APPLE_UIKIT_PORT ON)
+endif()
 
 if(MACOS_PORT AND (NOT APPLE OR CMAKE_SYSTEM_NAME STREQUAL "iOS"))
     message(FATAL_ERROR "MACOS_PORT is available only for native macOS builds.")
+endif()
+if(VISIONOS_PORT AND NOT CMAKE_SYSTEM_NAME STREQUAL "visionOS")
+    message(FATAL_ERROR "VISIONOS_PORT requires CMAKE_SYSTEM_NAME=visionOS.")
 endif()
 
 # Both native Apple targets use the same AVAudioEngine backend. Keeping this
 # decision here prevents a platform preset from silently falling back to the
 # legacy OpenAL path.
-if(IPADOS_PORT OR MACOS_PORT)
+if(APPLE_NATIVE_PORT)
     set(OPENAL OFF CACHE BOOL "OpenAL is replaced by AVAudioEngine on Apple ports" FORCE)
 endif()
 
@@ -87,6 +114,7 @@ add_feature_info(SDL1 SDL1 "SDL1 video backend")
 add_feature_info(SDL2 SDL2 "SDL2 video backend")
 add_feature_info(OpenAL OPENAL "OpenAL audio backend")
 add_feature_info(macOSPort MACOS_PORT "Self-contained native macOS application")
+add_feature_info(visionOSPort VISIONOS_PORT "Native visionOS prototype")
 add_feature_info(RemasterTD BUILD_REMASTERTD, "Remastered Tiberian Dawn dll")
 add_feature_info(RemasterRA BUILD_REMASTERRA "Remastered Red Alert dll")
 add_feature_info(TiberianDawn BUILD_VANILLATD "Tiberian Dawn executable")
@@ -170,7 +198,7 @@ if(SDL1)
 endif()
 
 if(SDL2)
-    if(IPADOS_PORT OR MACOS_PORT)
+    if(APPLE_NATIVE_PORT)
         set(SDL_SHARED OFF CACHE BOOL "Build SDL as a shared library" FORCE)
         set(SDL_STATIC ON CACHE BOOL "Build SDL as a static library" FORCE)
         set(SDL_TEST OFF CACHE BOOL "Build the SDL test suite" FORCE)
@@ -187,8 +215,19 @@ if(SDL2)
         # UIKit's SDL entry point is compiled as C and needs the SDK's
         # stdint/stdlib declarations. Keep SDL on the system C library.
         set(SDL_LIBC ON CACHE BOOL "Use the system C library" FORCE)
+        if(VISIONOS_PORT)
+            # OpenGL ES/EAGL is unavailable on visionOS.  The native port uses
+            # SDL's Metal renderer exclusively; keep the iPad and macOS
+            # backends unchanged.
+            set(SDL_OPENGL OFF CACHE BOOL "Include OpenGL support" FORCE)
+            set(SDL_OPENGLES OFF CACHE BOOL "Include OpenGL ES support" FORCE)
+            # visionOS does not expose the low-level HID transport used by
+            # SDL's HIDAPI backend. GameController support remains enabled.
+            set(SDL_HIDAPI OFF CACHE BOOL "Enable SDL HIDAPI support" FORCE)
+            set(SDL_HIDAPI_JOYSTICK OFF CACHE BOOL "Use HIDAPI for joysticks" FORCE)
+        endif()
         add_subdirectory(third_party/SDL2 EXCLUDE_FROM_ALL)
-        if(IPADOS_PORT)
+        if(APPLE_UIKIT_PORT)
             list(APPEND VANILLA_LIBS SDL2::SDL2main SDL2::SDL2-static)
         else()
             list(APPEND VANILLA_LIBS SDL2::SDL2-static)
@@ -196,6 +235,10 @@ if(SDL2)
         include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/SDL2/include)
         if(IPADOS_PORT)
             list(APPEND VANILLA_DEFS IPADOS_PORT)
+        elseif(VISIONOS_PORT)
+            # The native prototype deliberately reuses the mature UIKit/touch
+            # layer while exposing VISIONOS_PORT for platform-specific growth.
+            list(APPEND VANILLA_DEFS IPADOS_PORT VISIONOS_PORT)
         else()
             list(APPEND VANILLA_DEFS MACOS_PORT)
         endif()

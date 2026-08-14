@@ -1,11 +1,10 @@
 # Apple platform feature parity
 
-The shipping iPadOS and macOS apps use the same game engine and shared Apple
-enhancement layer. New features are expected to ship on both platforms unless
-an operating-system capability makes that impossible. A planned native
-visionOS target joins this parity contract when its command-window milestone
-is enabled; until then, `Designed for iPad` compatibility is a separately
-tested bridge rather than a claim of native parity.
+The shipping iPadOS and macOS apps and the native visionOS command-window
+prototype use the same game engine and shared Apple enhancement layer. New
+features are expected to reach all three build targets unless an operating-
+system capability makes that impossible. `Designed for iPad` compatibility is
+a separately tested bridge and never substitutes for native-target validation.
 
 Shared today:
 
@@ -17,13 +16,12 @@ Shared today:
 - AVAudioEngine playback, local Gold-CD import, save-file access, and the
   shared local/private-room multiplayer protocol and classic match lobby.
 
-Platform-specific integrations remain native: touch, Pencil, safe areas,
+Platform-specific integrations remain native: touch, Pencil, gaze/pinch, safe areas,
 Stage Manager, iPad interruption recovery, Files pickers, AppKit import panels,
 and Finder/iCloud save-folder access.
 
-Every pull request touching shared behavior must pass both Apple compile jobs.
-Once the native visionOS target enters the repository, its compile job becomes
-mandatory too. A shared feature then remains incomplete until its behavior is
+Every pull request touching shared behavior must pass all three Apple compile
+jobs. A shared feature remains incomplete until its behavior is
 implemented or explicitly documented as unavailable on all three platforms.
 
 Multiplayer is implemented as one shared deterministic protocol and lobby model

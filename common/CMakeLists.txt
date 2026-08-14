@@ -138,7 +138,7 @@ set(COMMONV_SRC
     wwmouse.cpp
 )
 
-if(IPADOS_PORT OR MACOS_PORT)
+if(APPLE_NATIVE_PORT)
     list(APPEND COMMONV_SRC
         audio_queue_state.cpp
         ipados_audio_engine.mm
@@ -187,13 +187,16 @@ target_link_libraries(common PUBLIC ${COMMON_LIBS})
 target_include_directories(common PUBLIC .)
 target_compile_definitions(common PRIVATE FIXIT_FAST_LOAD $<$<CONFIG:Debug>:_DEBUG>)
 target_compile_options(common PUBLIC ${VC_CXX_FLAGS})
-if(IPADOS_PORT)
+if(IPADOS_PORT OR VISIONOS_PORT)
     target_compile_definitions(common PRIVATE IPADOS_PORT)
     # CMake 4.4 may leave the compiler feature table empty with the Xcode 26
     # iOS generator. The project-wide CXX_STANDARD setting still emits C++11.
     set_target_properties(common PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES)
 else()
     target_compile_features(common PUBLIC cxx_std_11)
+endif()
+if(VISIONOS_PORT)
+    target_compile_definitions(common PRIVATE VISIONOS_PORT)
 endif()
 if(MACOS_PORT)
     target_compile_definitions(common PRIVATE MACOS_PORT)
@@ -226,7 +229,7 @@ if(BUILD_VANILLATD OR BUILD_VANILLARA OR BUILD_TESTS)
     if(OPENAL)
         target_compile_definitions(commonv PUBLIC OPENAL_BUILD)
     endif()
-    if(IPADOS_PORT OR MACOS_PORT)
+    if(APPLE_NATIVE_PORT)
         target_compile_definitions(commonv PUBLIC AVAUDIOENGINE_BUILD)
         set_target_properties(commonv PROPERTIES XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES")
     endif()

@@ -136,6 +136,17 @@ if(IPADOS_PORT)
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
         ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
     )
+elseif(VISIONOS_PORT)
+    list(APPEND TIBDAWN_SRC
+        ipados_lifecycle.cpp
+        ipados_save_bridge.cpp
+        ${CMAKE_SOURCE_DIR}/common/ipados_localization.cpp
+        ${CMAKE_SOURCE_DIR}/common/relay_protocol.cpp
+        ${CMAKE_SOURCE_DIR}/platform/apple/apple_relay_transport.mm
+        ${CMAKE_SOURCE_DIR}/platform/apple/visionos_platform.mm
+        ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/ISArchiveV3.cpp
+        ${CMAKE_SOURCE_DIR}/third_party/unshieldv3/blast.c
+    )
 elseif(MACOS_PORT)
     list(APPEND TIBDAWN_SRC
         ${CMAKE_SOURCE_DIR}/common/ipados_localization.cpp
@@ -147,7 +158,7 @@ elseif(MACOS_PORT)
     )
 endif()
 
-if(IPADOS_PORT OR MACOS_PORT)
+if(APPLE_NATIVE_PORT)
     set_source_files_properties(
         ${CMAKE_SOURCE_DIR}/platform/apple/apple_relay_transport.mm
         PROPERTIES COMPILE_FLAGS "-fobjc-arc"
@@ -311,6 +322,59 @@ if(BUILD_VANILLATD)
             if(IPADOS_DEVELOPMENT_TEAM)
                 set_target_properties(TiberianDawn PROPERTIES
                     XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${IPADOS_DEVELOPMENT_TEAM}"
+                    XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+                )
+            endif()
+        elseif(VISIONOS_PORT)
+            # SDL's UIKit entry point remains the application entry for the
+            # native windowed visionOS prototype.
+            set_source_files_properties(startup.cpp PROPERTIES COMPILE_DEFINITIONS "main=SDL_main")
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/visionos/Assets.xcassets
+                ${CMAKE_SOURCE_DIR}/platform/apple/PrivacyInfo.xcprivacy
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/manifest.ini
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/ui
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/buggy
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/humvee
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/minigunner
+            )
+            target_sources(TiberianDawn PRIVATE
+                ${CMAKE_SOURCE_DIR}/resources/visionos/Assets.xcassets
+                ${CMAKE_SOURCE_DIR}/platform/apple/PrivacyInfo.xcprivacy
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/manifest.ini
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+            )
+            set_target_properties(TiberianDawn PROPERTIES
+                MACOSX_BUNDLE_GUI_IDENTIFIER "${VISIONOS_BUNDLE_IDENTIFIER}"
+                MACOSX_BUNDLE_BUNDLE_NAME "Tiberian Dawn for Vision Pro"
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/platform/apple/Info-visionOS.plist.in"
+                XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${VISIONOS_BUNDLE_IDENTIFIER}"
+                XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES"
+                XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
+            )
+            target_link_libraries(TiberianDawn "-framework UIKit" "-framework AVFAudio" "-framework Metal" "-framework MetalKit" "-framework QuartzCore" "-framework UniformTypeIdentifiers")
+            if(VISIONOS_DEVELOPMENT_TEAM)
+                set_target_properties(TiberianDawn PROPERTIES
+                    XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${VISIONOS_DEVELOPMENT_TEAM}"
                     XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
                 )
             endif()
