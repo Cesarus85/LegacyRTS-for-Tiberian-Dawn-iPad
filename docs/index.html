@@ -28,6 +28,7 @@
       <a href="#gameplay" data-de="Video" data-en="Video">Video</a>
       <a href="#download" data-de="Download" data-en="Download">Download</a>
       <a href="#features" data-de="Features" data-en="Features">Features</a>
+      <a href="#vision" data-de="Vision Pro" data-en="Vision Pro">Vision Pro</a>
       <a href="#controls" data-de="Steuerung" data-en="Controls">Steuerung</a>
       <a href="#build" data-de="Bauen" data-en="Build">Bauen</a>
       <a href="#faq">FAQ</a>
@@ -94,7 +95,7 @@
     </section>
 
     <section class="status" aria-label="Project status">
-      <div><strong>iPadOS 15+ · macOS 11+</strong><span data-de="Zielplattformen" data-en="Target platforms">Zielplattformen</span></div>
+      <div><strong>iPadOS 15+ · macOS 11+ · visionOS</strong><span data-de="visionOS als nativer Prototyp" data-en="visionOS as a native prototype">visionOS als nativer Prototyp</span></div>
       <div><strong>Multiplayer beta</strong><span data-de="LAN &amp; private Räume" data-en="LAN &amp; private rooms">LAN &amp; private Räume</span></div>
       <div><strong>GPL-3.0+</strong><span data-de="Mit Zusatzbedingungen" data-en="With additional terms">Mit Zusatzbedingungen</span></div>
       <div><strong>0 MB</strong><span data-de="Enthaltene Spieldaten" data-en="Bundled game data">Enthaltene Spieldaten</span></div>
@@ -115,6 +116,23 @@
         <article><span class="index">06</span><h3 data-de="Apple-Audioverhalten" data-en="Apple audio behavior">Apple-Audioverhalten</h3><p data-de="System-Stummschaltung, Bluetooth-Routen sowie Siri-, Anruf- und Alarm-Unterbrechungen werden berücksichtigt." data-en="System mute, Bluetooth routes, and Siri, call, and alarm interruptions are handled.">System-Stummschaltung, Bluetooth-Routen sowie Siri-, Anruf- und Alarm-Unterbrechungen werden berücksichtigt.</p></article>
         <article><span class="index">07</span><h3 data-de="Privater Multiplayer" data-en="Private multiplayer">Privater Multiplayer</h3><p data-de="Zwei bis sechs Spieler verbinden iPad und Mac direkt im lokalen Netz oder über kurzlebige, verschlüsselte Internet-Räume – ohne Accounts und ohne Spieldaten-Upload." data-en="Two to six players connect iPad and Mac directly on a LAN or through ephemeral encrypted Internet rooms—with no accounts and no game-data upload.">Zwei bis sechs Spieler verbinden iPad und Mac direkt im lokalen Netz oder über kurzlebige, verschlüsselte Internet-Räume – ohne Accounts und ohne Spieldaten-Upload.</p></article>
       </div>
+    </section>
+
+    <section class="section vision" id="vision" aria-labelledby="vision-title">
+      <div class="vision-copy">
+        <p class="eyebrow" data-de="NATIVER VISIONOS-PROTOTYP" data-en="NATIVE VISIONOS PROTOTYPE">NATIVER VISIONOS-PROTOTYP</p>
+        <h2 id="vision-title" data-de="Das Kommandofenster im Shared Space" data-en="The command window in Shared Space">Das Kommandofenster im Shared Space</h2>
+        <p data-de="Neben der getesteten „Designed for iPad“-Kompatibilität enthält das Repository nun einen eigenständigen nativen visionOS-Build. Er nutzt dieselbe Engine, Metal-Darstellung, Audioengine, Lokalisierung, Importe, Spielstände und Multiplayer-Basis wie iPad und Mac." data-en="Alongside the tested Designed for iPad compatibility path, the repository now includes a separate native visionOS build. It uses the same engine, Metal presentation, audio engine, localization, imports, saves, and multiplayer foundation as iPad and Mac.">Neben der getesteten „Designed for iPad“-Kompatibilität enthält das Repository nun einen eigenständigen nativen visionOS-Build. Er nutzt dieselbe Engine, Metal-Darstellung, Audioengine, Lokalisierung, Importe, Spielstände und Multiplayer-Basis wie iPad und Mac.</p>
+        <p class="warning" data-de="Der Simulator- und unsigned Gerätebuild kompilieren; der native Import-Assistent startet im Vision-Pro-Simulator. Blick-/Pinch-Komfort, Audio, Lebenszyklus und Langzeittest auf echter Hardware sind noch Freigabekriterien. Deshalb gibt es noch keinen öffentlichen visionOS-Download." data-en="The Simulator and unsigned device builds compile, and the native importer launches in Vision Pro Simulator. Gaze/pinch comfort, audio, lifecycle, and long-session behavior on physical hardware remain release gates, so there is no public visionOS download yet.">Der Simulator- und unsigned Gerätebuild kompilieren; der native Import-Assistent startet im Vision-Pro-Simulator. Blick-/Pinch-Komfort, Audio, Lebenszyklus und Langzeittest auf echter Hardware sind noch Freigabekriterien. Deshalb gibt es noch keinen öffentlichen visionOS-Download.</p>
+        <div class="actions">
+          <a class="button secondary" href="../README-visionOS.md" data-repo-path="README-visionOS.md" data-de="Build-Anleitung" data-en="Build guide">Build-Anleitung</a>
+          <a class="button tertiary" href="VISIONOS-CONCEPT.md" data-repo-path="docs/VISIONOS-CONCEPT.md" data-de="Konzept &amp; Testmatrix" data-en="Concept &amp; test matrix">Konzept &amp; Testmatrix</a>
+        </div>
+      </div>
+      <figure class="vision-art">
+        <img src="assets/vision-pro-tiberian-dawn-collage-v1.png" width="1229" height="1638" loading="lazy" alt="Originale Konzeptillustration eines futuristischen Kommandanten mit räumlichem Headset vor einer geteilten Strategie-Kulisse" data-alt-de="Originale Konzeptillustration eines futuristischen Kommandanten mit räumlichem Headset vor einer geteilten Strategie-Kulisse" data-alt-en="Original concept illustration of a futuristic commander wearing a spatial headset before a split strategy battlefield">
+        <figcaption><span>VISIONOS // ORIGINAL CONCEPT ART</span><span class="signal">PROTOTYPE</span></figcaption>
+      </figure>
     </section>
 
     <section class="section split" id="controls">

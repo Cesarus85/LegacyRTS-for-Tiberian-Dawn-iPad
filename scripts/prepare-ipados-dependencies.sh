@@ -4,10 +4,20 @@ set -eu
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 sdl_directory="$repository_root/third_party/SDL2"
 patch_file="$repository_root/patches/SDL2-ipados.patch"
+visionos_patch_file="$repository_root/patches/SDL2-visionos.patch"
 
 if [ ! -f "$sdl_directory/CMakeLists.txt" ]; then
     echo "SDL2 is missing. Run: git submodule update --init --recursive" >&2
     exit 1
+fi
+
+# The native visionOS preparation is an intentional superset of the iPadOS
+# state. Its guarded follow-up patch can overlap context from the first patch,
+# so recognize the combined end state before checking iPadOS in isolation.
+if [ -f "$visionos_patch_file" ] \
+    && git -C "$sdl_directory" apply --reverse --check "$visionos_patch_file" >/dev/null 2>&1; then
+    echo "Tiberian Dawn SDL2 iPadOS patch is already applied (visionOS-ready checkout)."
+    exit 0
 fi
 
 if git -C "$sdl_directory" apply --reverse --check "$patch_file" >/dev/null 2>&1; then

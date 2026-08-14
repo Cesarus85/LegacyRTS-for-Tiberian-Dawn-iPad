@@ -1,6 +1,8 @@
 # Apple Vision Pro port concept
 
-Status: documented design direction; no native visionOS target is enabled yet.
+Status: V0 compatibility testing is active and the V1 native command-window
+build path is enabled as a prototype. It is not a supported or downloadable
+visionOS release until it passes on physical Apple Vision Pro hardware.
 
 ## Design principle
 
@@ -144,11 +146,13 @@ shared infrastructure, not a visionOS fork:
 - keep imports, saves, localization, networking, and settings shared with the
   other Apple targets.
 
-The vendored SDL 2.32 source contains visionOS platform support, but the
-project's custom scene patch and build logic are iPad-specific. The native
-target must audit upstream SDL visionOS behavior rather than applying the iPad
-patch blindly. SDL remains useful for shared input and fallback presentation;
-the SwiftUI/RealityKit shell owns spatial scenes.
+The pinned SDL 2.32.10 source recognizes visionOS but its SDL2 UIKit backend
+still uses several APIs that are unavailable there. The repository therefore
+applies the reviewed iPad lifecycle/input patch first and a separate, guarded
+visionOS compatibility patch second. The latter backports the required
+window/Metal concepts without enabling OpenGL ES or low-level HIDAPI on
+visionOS. SDL remains useful for shared input and fallback presentation; a
+later SwiftUI/RealityKit shell will own spatial scenes.
 
 ## Build-system plan
 
@@ -237,6 +241,11 @@ the original engine format permits it.
 Gate: import through a live mission works in the compatible window without a
 crash, black frame, incorrect coordinates, or inaccessible exit.
 
+Current evidence: the current iPad bundle launches in Vision Simulator, uses
+the migrated local C&C Gold data, renders videos and the interrupted-mission
+dialog, and responds to hover. Simulator pinch/click translation remains under
+validation, so V0 is not yet marked complete.
+
 ### V1 — native command window
 
 - Add native CMake presets, platform bridge, Info.plist, resources, CI compile,
@@ -248,6 +257,14 @@ crash, black frame, incorrect coordinates, or inaccessible exit.
 Gate: the native app passes campaigns, videos, input, saves, lifecycle, audio,
 and resizing in Simulator and on physical hardware. Until then, the compatible
 iPad app remains the supported Vision Pro route.
+
+Implemented build foundation: `VISIONOS_PORT`, separate arm64 simulator/device
+presets, a visionOS platform boundary, clean Info.plist and resources, shared
+privacy manifest, reproducible scripts, and mandatory CI compile jobs. The V1
+behavioral gate remains open. On 14 August 2026, native arm64 simulator and
+unsigned device builds succeeded; the simulator bundle installed, launched,
+and displayed the localized importer. That is a build/startup milestone, not a
+gaze-and-pinch or physical-headset acceptance result.
 
 ### V2 — spatial interaction polish
 

@@ -22,7 +22,7 @@ legally entitled to use.
 
 [Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad-and-macOS/) · [iPad build guide](README-iPadOS.md) ·
 [macOS build guide](README-macOS.md) · [Apple-platform parity](docs/PLATFORM_PARITY.md) ·
-[Multiplayer guide](docs/MULTIPLAYER.md) · [architecture](docs/MULTIPLAYER-CONCEPT.md) · [Vision Pro plan](docs/VISIONOS-CONCEPT.md) ·
+[Multiplayer guide](docs/MULTIPLAYER.md) · [architecture](docs/MULTIPLAYER-CONCEPT.md) · [Vision Pro build guide](README-visionOS.md) · [Vision Pro plan](docs/VISIONOS-CONCEPT.md) ·
 [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
 ## Gameplay on iPad
@@ -49,6 +49,7 @@ original game data is distributed with this repository.
 - Metal-accelerated SDL rendering
 - Optional modern-art mode for cursor and initial GDI/Nod units
 - AVAudioEngine audio on both platforms, with iPadOS interruption and route handling
+- Native Apple Vision Pro command-window build path (prototype; hardware acceptance pending)
 - Two-to-six-player cross-play over a local network or expiring private Internet rooms
 - No analytics, accounts, or advertising
 
@@ -86,9 +87,10 @@ through local ISO import, videos, menus, mouse input, campaign launch, and a liv
 mission. Both remain source-built projects rather than App Store distributions.
 
 Cross-platform multiplayer now reuses the original deterministic lockstep
-engine over direct LAN traffic or a bounded private-room TLS relay. Apple Vision Pro begins
-with `Designed for iPad` compatibility before a native visionOS command window
-and optional spatial presentation. See the [multiplayer architecture](docs/MULTIPLAYER-CONCEPT.md)
+engine over direct LAN traffic or a bounded private-room TLS relay. Apple Vision Pro now has
+an actively tested `Designed for iPad` compatibility path and a separately
+compiled native visionOS command-window prototype before optional spatial
+presentation. See the [multiplayer architecture](docs/MULTIPLAYER-CONCEPT.md)
 and [Vision Pro concept](docs/VISIONOS-CONCEPT.md) for scope, milestones,
 privacy, failure policy, and release gates.
 
@@ -163,10 +165,9 @@ neighbour scaling.
 - Multiplayer is a beta. Local and private Internet play are implemented and
   compile on both Apple targets, but extended physical-device soak, hostile
   Wi-Fi, suspend/recovery and maximum-player testing remain release gates.
-- A native visionOS target is planned but not yet enabled. The staged
-  [Vision Pro plan](docs/VISIONOS-CONCEPT.md) starts with compatibility testing
-  of the existing iPad app and requires physical Vision Pro acceptance before
-  claiming a native port.
+- The native visionOS command-window target compiles as a prototype, but it is
+  not a released/supported port until the staged [Vision Pro plan](docs/VISIONOS-CONCEPT.md)
+  passes on a physical headset. No public visionOS download is provided yet.
 - Red Alert is present in the upstream source tree but is not a supported Apple
   app target in this project.
 - External-display behavior is not release-tested.

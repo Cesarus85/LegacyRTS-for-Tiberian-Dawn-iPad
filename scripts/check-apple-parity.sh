@@ -13,13 +13,17 @@ resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png'
 printf '%s\n' "$required_assets" | while IFS= read -r asset; do
     test -f "$asset" || { echo "Missing shared Apple asset: $asset" >&2; exit 1; }
     references=$(grep -cF "$asset" tiberiandawn/CMakeLists.txt)
-    test "$references" -ge 2 || {
-        echo "Shared Apple asset is not packaged by both targets: $asset" >&2
+    test "$references" -ge 3 || {
+        echo "Shared Apple asset is not packaged by all three native targets: $asset" >&2
         exit 1
     }
 done
 
-grep -q 'if(IPADOS_PORT OR MACOS_PORT)' common/CMakeLists.txt
+grep -q 'if(APPLE_NATIVE_PORT)' common/CMakeLists.txt
+grep -q 'VISIONOS_PORT' CMakeLists.txt
+grep -q '"name": "visionos-simulator"' CMakePresets.json
+grep -q '"name": "visionos-device"' CMakePresets.json
+grep -q '^  visionos-compile:' .github/workflows/ci.yml
 grep -q '#if defined(IPADOS_PORT) || defined(MACOS_PORT)' tiberiandawn/visudlg.cpp
 grep -q '#if defined(IPADOS_PORT) || defined(MACOS_PORT)' tiberiandawn/gamedlg.cpp
 grep -q '"OPENAL": "OFF"' CMakePresets.json
@@ -33,6 +37,17 @@ grep -q 'MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"' tiberiandawn/C
 grep -q 'MACOSX_BUNDLE_BUNDLE_VERSION "${TIBERIAN_DAWN_BUILD_VERSION}"' tiberiandawn/CMakeLists.txt
 grep -q '<string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>' platform/apple/Info-iPadOS.plist.in
 grep -q '<string>@MACOSX_BUNDLE_SHORT_VERSION_STRING@</string>' platform/apple/Info-macOS.plist.in
+grep -q '<string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>' platform/apple/Info-visionOS.plist.in
+grep -q '<string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>' platform/apple/Info-visionOS.plist.in
+test -f platform/apple/PrivacyInfo.xcprivacy
+test -f resources/visionos/Assets.xcassets/Contents.json
+test -s patches/SDL2-visionos.patch
+grep -q 'patches/SDL2-visionos.patch' scripts/prepare-visionos-dependencies.sh
+for script in scripts/prepare-visionos-dependencies.sh scripts/configure-visionos.sh \
+              scripts/build-visionos-simulator.sh scripts/build-visionos-device.sh; do
+    test -x "$script"
+    sh -n "$script"
+done
 
 if grep -R -n -E 'LegacyRTS|LEGACY_RTS' \
     --exclude=check-apple-parity.sh \

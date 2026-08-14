@@ -123,6 +123,45 @@
             }
         },
         {
+            "name": "visionos-simulator",
+            "displayName": "Tiberian Dawn for Vision Pro — Simulator Prototype",
+            "generator": "Xcode",
+            "binaryDir": "${sourceDir}/build/visionos-simulator",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "visionOS",
+                "CMAKE_OSX_SYSROOT": "xrsimulator",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "2.0",
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH": "YES",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED": "NO",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED": "NO",
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnApple-Vision-Simulator-Products",
+                "BUILD_VANILLATD": "ON",
+                "BUILD_VANILLARA": "OFF",
+                "BUILD_REMASTERTD": "OFF",
+                "BUILD_REMASTERRA": "OFF",
+                "BUILD_TESTS": "OFF",
+                "BUILD_TOOLS": "OFF",
+                "MAP_EDITORTD": "OFF",
+                "NETWORKING": "ON",
+                "SDL1": "OFF",
+                "SDL2": "ON",
+                "OPENAL": "OFF",
+                "VISIONOS_PORT": "ON",
+                "MAKE_BUNDLE": "ON"
+            }
+        },
+        {
+            "name": "visionos-device",
+            "inherits": "visionos-simulator",
+            "displayName": "Tiberian Dawn for Vision Pro — Device Prototype",
+            "binaryDir": "${sourceDir}/build/visionos-device",
+            "cacheVariables": {
+                "CMAKE_OSX_SYSROOT": "xros",
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "/private/tmp/TiberianDawnApple-Vision-Device-Products"
+            }
+        },
+        {
             "name": "macos-universal",
             "displayName": "Tiberian Dawn for macOS — Universal App",
             "generator": "Xcode",
@@ -203,6 +242,20 @@
             "name": "ipados-device-release",
             "configurePreset": "ipados-device",
             "displayName": "Tiberian Dawn for iPad — Release",
+            "configuration": "Release",
+            "targets": ["TiberianDawn"]
+        },
+        {
+            "name": "visionos-simulator",
+            "configurePreset": "visionos-simulator",
+            "displayName": "Tiberian Dawn for Vision Pro — Simulator Prototype",
+            "configuration": "Debug",
+            "targets": ["TiberianDawn"]
+        },
+        {
+            "name": "visionos-device",
+            "configurePreset": "visionos-device",
+            "displayName": "Tiberian Dawn for Vision Pro — Unsigned Device Prototype",
             "configuration": "Release",
             "targets": ["TiberianDawn"]
         },
@@ -295,6 +348,19 @@
                 {
                     "type": "build",
                     "name": "nonet"
+                }
+            ]
+        },
+        {
+            "name": "visionos-simulator",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "visionos-simulator"
+                },
+                {
+                    "type": "build",
+                    "name": "visionos-simulator"
                 }
             ]
         },

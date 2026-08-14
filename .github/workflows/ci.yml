@@ -66,6 +66,38 @@ jobs:
       - name: Compile unsigned iPad target
         run: cmake --build --preset ipados-device -- -quiet CODE_SIGNING_ALLOWED=NO
 
+  visionos-compile:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install native visionOS CMake support
+        run: brew install cmake
+      - name: Verify visionOS SDKs
+        run: |
+          xcrun --sdk xrsimulator --show-sdk-path
+          xcrun --sdk xros --show-sdk-path
+      - name: Apply reviewed UIKit SDL patch
+        run: ./scripts/prepare-visionos-dependencies.sh
+      - name: Configure native visionOS simulator prototype
+        run: >-
+          cmake --preset visionos-simulator
+          -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+      - name: Compile native visionOS simulator prototype
+        run: cmake --build --preset visionos-simulator -- -quiet CODE_SIGNING_ALLOWED=NO
+      - name: Configure unsigned native visionOS device prototype
+        run: >-
+          cmake --preset visionos-device
+          -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+      - name: Compile unsigned native visionOS device prototype
+        run: cmake --build --preset visionos-device -- -quiet CODE_SIGNING_ALLOWED=NO
+
   macos-app-compile:
     runs-on: macos-15
     timeout-minutes: 30

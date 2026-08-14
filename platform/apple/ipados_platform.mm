@@ -1284,12 +1284,18 @@ void TiberianDawn_SetCompactWindowWarning(bool visible)
     dispatch_async(dispatch_get_main_queue(), ^{
         UILabel* label = CompactWarningLabel();
         label.text = L("compact_warning");
-        UIWindow* window = UIApplication.sharedApplication.keyWindow;
-        if (!window) {
-            for (UIWindowScene* scene in UIApplication.sharedApplication.connectedScenes) {
-                if (![scene isKindOfClass:UIWindowScene.class]) continue;
-                for (UIWindow* candidate in scene.windows) if (candidate.isKeyWindow) window = candidate;
+        UIWindow* window = nil;
+        for (UIScene* connectedScene in UIApplication.sharedApplication.connectedScenes) {
+            if (![connectedScene isKindOfClass:UIWindowScene.class]) continue;
+            UIWindowScene* scene = (UIWindowScene*)connectedScene;
+            for (UIWindow* candidate in scene.windows) {
+                if (!window) window = candidate;
+                if (candidate.isKeyWindow) {
+                    window = candidate;
+                    break;
+                }
             }
+            if (window.isKeyWindow) break;
         }
         if (visible && window && label.superview != window) {
             [label removeFromSuperview];

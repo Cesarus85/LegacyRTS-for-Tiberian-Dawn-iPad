@@ -92,6 +92,12 @@ h2 { margin: 0 0 1.2rem; font-family: system-ui, sans-serif; font-size: clamp(2.
 .feature-grid h3, .steps h3 { margin: 3rem 0 .8rem; font-family: system-ui, sans-serif; font-size: 1.15rem; }
 .feature-grid p, .steps p { color: var(--muted); font-family: system-ui, sans-serif; font-size: .92rem; }
 .index { color: var(--acid); font-size: .7rem; }
+.vision { display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(2rem, 6vw, 6rem); align-items: center; border-top: 1px solid var(--line); }
+.vision-copy > p:not(.eyebrow, .warning) { color: var(--muted); font-family: system-ui, sans-serif; font-size: 1.06rem; }
+.vision-art { position: relative; margin: 0; overflow: hidden; border: 1px solid #38453e; border-radius: 18px; background: #111714; box-shadow: 0 35px 80px #000; }
+.vision-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 66%, rgb(5 8 7 / 88%)); pointer-events: none; }
+.vision-art img { display: block; width: 100%; max-height: 720px; object-fit: cover; object-position: center 38%; }
+.vision-art figcaption { position: absolute; right: 1rem; bottom: .8rem; left: 1rem; z-index: 1; display: flex; justify-content: space-between; gap: 1rem; color: #c5d0c8; font-size: .58rem; letter-spacing: .1em; }
 .split { display: grid; grid-template-columns: .85fr 1.15fr; gap: 7rem; }
 .sticky-heading { position: sticky; top: 130px; align-self: start; }
 .control-list { border-top: 1px solid var(--line); }
@@ -120,7 +126,7 @@ footer { display: grid; grid-template-columns: 1fr 1.3fr; gap: 1rem 4rem; paddin
   .gameplay-heading { grid-template-columns: 1fr; gap: 1rem; }
   .status { grid-template-columns: repeat(2, 1fr); margin-inline: 1.25rem; }.status div:nth-child(2) { border-right: 0; }.status div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
-  .split, .build { grid-template-columns: 1fr; gap: 2rem; }.sticky-heading { position: static; }.build .text-link { grid-column: 1; }
+  .vision, .split, .build { grid-template-columns: 1fr; gap: 2rem; }.vision-art { max-width: 680px; }.sticky-heading { position: static; }.build .text-link { grid-column: 1; }
   .steps { grid-template-columns: 1fr; }
 }
 

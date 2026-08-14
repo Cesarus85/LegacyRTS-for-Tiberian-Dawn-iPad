@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible iPadOS or macOS problem without sharing original game data
+description: Report a reproducible Apple-platform problem without sharing original game data
 title: "[Bug]: "
 labels: [bug]
 body:
@@ -14,6 +14,9 @@ body:
       options:
         - Physical iPad
         - macOS 11+ native app
+        - Designed for iPad on Apple Vision Pro
+        - Native visionOS Simulator prototype
+        - Physical Apple Vision Pro native prototype
         - Other host/test build
     validations:
       required: true

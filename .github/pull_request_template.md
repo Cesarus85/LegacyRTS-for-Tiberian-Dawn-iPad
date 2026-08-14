@@ -8,6 +8,8 @@ What does this change and why?
 - [ ] Universal 2 macOS app build, if shared or macOS code changed
 - [ ] Physical iPad Debug build, if iPad code changed
 - [ ] Physical iPad Release build, if release behavior changed
+- [ ] Native visionOS simulator compile, if shared Apple or visionOS code changed
+- [ ] Physical Vision Pro validation is explicitly recorded as pending or passed
 
 ## Publication safety
 
