@@ -665,7 +665,7 @@ index df9c998..41fa042 100644
  #if !TARGET_OS_VISION
  - (void)tiberianDawnForiPadPushPencilEvent:(Sint32)code location:(CGPoint)location
  {
-@@ -120,6 +266,44 @@ - (instancetype)initWithFrame:(CGRect)frame
+@@ -120,6 +266,46 @@ - (instancetype)initWithFrame:(CGRect)frame
          self.multipleTouchEnabled = YES;
          SDL_AddTouch(directTouchId, SDL_TOUCH_DEVICE_DIRECT, "");
  #endif
@@ -687,6 +687,7 @@ index df9c998..41fa042 100644
 +        [self addGestureRecognizer:visionPan];
 +        [self addGestureRecognizer:visionLongPress];
 +
++#if defined(__VISION_OS_VERSION_MAX_ALLOWED) && __VISION_OS_VERSION_MAX_ALLOWED >= 260000
 +        if (@available(visionOS 26.0, *)) {
 +            /* A transparent, large semantic scroll surface lets visionOS own
 +             * gaze privacy and acceleration. Its offset is translated into
@@ -707,10 +708,11 @@ index df9c998..41fa042 100644
 +            [self insertSubview:tiberianDawnVisionLookScrollView atIndex:0];
 +        }
 +#endif
++#endif
 
  #if !TARGET_OS_TV && defined(__IPHONE_13_4)
          if (@available(iOS 13.4, *)) {
-@@ -302,9 +486,18 @@ - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -302,9 +488,18 @@ - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
      for (UITouch *touch in touches) {
          BOOL handled = NO;
 
@@ -730,7 +732,7 @@ index df9c998..41fa042 100644
                  if (!SDL_HasGCMouse()) {
                      int i;
 
-@@ -365,9 +558,16 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -365,9 +560,16 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
      for (UITouch *touch in touches) {
          BOOL handled = NO;
 
@@ -748,7 +750,7 @@ index df9c998..41fa042 100644
                  if (!SDL_HasGCMouse()) {
                      int i;
 
-@@ -430,6 +630,12 @@ - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -430,6 +632,12 @@ - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
      for (UITouch *touch in touches) {
          BOOL handled = NO;
 

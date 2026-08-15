@@ -41,6 +41,8 @@ Mac download remains version 0.2.2 until the next binary release is packaged.
 
 - Right-edge gaze scrolling on Vision Pro now uses the complete command-window
   width.
+- visionOS builds made with pre-26 SDKs now compile without the optional
+  Look-to-Scroll API and retain the custom edge-scroll fallback.
 - Modern artwork no longer reveals enemies through fog of war, leaks over the
   sidebar or menus, or remains visible after leaving a mission.
 - Infantry and vehicle modern artwork follows the commanded travel direction.
