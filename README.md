@@ -1,11 +1,11 @@
 # Tiberian Dawn for iPad, macOS and Vision Pro
 
-Current release: **0.2.2** (Apple build **202**). The macOS and iPadOS bundles
-share these values from the same CMake project metadata.
+Current release: **0.2.3** (Apple build **203**). The macOS, iPadOS, and
+visionOS bundles share these values from the same CMake project metadata.
 
-The current `main` source also contains the native, physical-device-tested
-visionOS prototype and the latest shared input and modern-art work. See the
-[changelog](CHANGELOG.md) for the exact source-versus-binary status.
+The ready-made macOS download is a signed, notarized Universal 2 package. The
+native, physical-device-tested visionOS prototype remains source-only. See the
+[changelog](CHANGELOG.md) for the complete release details.
 
 > **EA has not endorsed and does not support this product.**
 

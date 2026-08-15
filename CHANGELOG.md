@@ -4,10 +4,10 @@ All notable changes to Tiberian Dawn for Apple platforms are documented here.
 The project keeps iPadOS, macOS, and visionOS on one shared engine and content
 baseline wherever the operating systems permit it.
 
-## Unreleased — 2026-08-15
+## 0.2.3 — 2026-08-15
 
-This section describes the current source on `main`. The ready-made notarized
-Mac download remains version 0.2.2 until the next binary release is packaged.
+This release publishes the current shared Apple-platform source together with
+a signed, notarized Universal 2 macOS package for Apple Silicon and Intel.
 
 ### Added
 
