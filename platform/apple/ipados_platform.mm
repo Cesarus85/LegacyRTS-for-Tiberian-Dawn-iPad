@@ -35,6 +35,7 @@ namespace
 NSString* const ProductDirectory = @"TiberianDawn";
 NSString* const GameDirectory = @"vanillatd";
 NSString* const LanguagePreferenceKey = @"TiberianDawn.LanguagePreference";
+NSString* const TouchGuideShownKey = @"TiberianDawn.TouchGuideShown.v1";
 
 int StoredLanguagePreference()
 {
@@ -78,6 +79,26 @@ NSURL* LegacyDataURL()
                                                                inDomains:NSUserDomainMask] firstObject];
     return [[[documents URLByAppendingPathComponent:ProductDirectory isDirectory:YES]
         URLByAppendingPathComponent:GameDirectory isDirectory:YES] URLByStandardizingPath];
+}
+
+NSArray<NSURL*>* LocalGoldCDURLs()
+{
+    NSURL* documents = [[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory
+                                                               inDomains:NSUserDomainMask] firstObject];
+    if (!documents) return @[];
+
+    NSFileManager* manager = [NSFileManager defaultManager];
+    NSMutableArray<NSURL*>* result = [NSMutableArray arrayWithCapacity:2];
+    for (NSString* name in @[ @"CNC95_GDI.iso", @"CNC95_Nod.iso" ]) {
+        NSURL* url = [documents URLByAppendingPathComponent:name isDirectory:NO];
+        NSDictionary* attributes = [manager attributesOfItemAtPath:url.path error:nil];
+        if (![attributes[NSFileType] isEqualToString:NSFileTypeRegular]
+            || [attributes[NSFileSize] unsignedLongLongValue] == 0) {
+            return @[];
+        }
+        [result addObject:url];
+    }
+    return result;
 }
 
 bool ValidData(NSURL* directory)
@@ -408,6 +429,22 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
     [selectButton addTarget:self action:@selector(selectSources:) forControlEvents:UIControlEventTouchUpInside];
     [actions addArrangedSubview:selectButton];
 
+    if (LocalGoldCDURLs().count == 2) {
+        UIButton* localButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        localButton.translatesAutoresizingMaskIntoConstraints = NO;
+        [localButton setTitle:L("use_transferred_cds") forState:UIControlStateNormal];
+        [localButton setTitleColor:primary forState:UIControlStateNormal];
+        localButton.titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+        localButton.titleLabel.adjustsFontForContentSizeCategory = YES;
+        localButton.layer.borderColor = primary.CGColor;
+        localButton.layer.borderWidth = 1.5;
+        localButton.layer.cornerRadius = 12;
+        localButton.accessibilityHint = L("use_transferred_cds_hint");
+        [localButton.heightAnchor constraintGreaterThanOrEqualToConstant:52].active = YES;
+        [localButton addTarget:self action:@selector(useTransferredSources:) forControlEvents:UIControlEventTouchUpInside];
+        [actions insertArrangedSubview:localButton atIndex:0];
+    }
+
     UIButton* laterButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [laterButton setTitle:L("setup_later") forState:UIControlStateNormal];
     [laterButton setTitleColor:secondary forState:UIControlStateNormal];
@@ -434,15 +471,33 @@ void ExtractISOs(NSArray<NSURL*>* urls, NSURL* staging)
     ]];
 }
 
+- (void)useTransferredSources:(id)sender
+{
+    self.URLs = LocalGoldCDURLs();
+    self.finished = self.URLs.count == 2;
+}
+
 - (void)selectSources:(id)sender
 {
     // iPadOS currently maps the .iso extension to a dynamic UTI rather than
     // public.disk-image. Include that exact extension-derived type so ISO-9660
     // images remain selectable without widening the picker to arbitrary data.
     UTType* isoType = [UTType typeWithFilenameExtension:@"iso" conformingToType:UTTypeData];
-    NSArray<UTType*>* contentTypes = isoType
+    NSArray<UTType*>* contentTypes = nil;
+#if defined(VISIONOS_PORT)
+    // The visionOS Files provider does not currently expose every .iso file
+    // through either the extension-derived type or public.disk-image.  Admit
+    // generic data there so iCloud ISO placeholders remain visible; the
+    // importer still validates ISO-9660 structure and both C&C Gold discs
+    // before committing anything to the app container.
+    contentTypes = isoType
+        ? @[ isoType, UTTypeDiskImage, UTTypeData, UTTypeFolder ]
+        : @[ UTTypeDiskImage, UTTypeData, UTTypeFolder ];
+#else
+    contentTypes = isoType
         ? @[ isoType, UTTypeDiskImage, UTTypeFolder ]
         : @[ UTTypeDiskImage, UTTypeFolder ];
+#endif
     UIDocumentPickerViewController* picker = [[UIDocumentPickerViewController alloc]
         initForOpeningContentTypes:contentTypes asCopy:NO];
     picker.allowsMultipleSelection = YES;
@@ -1131,6 +1186,50 @@ const char* TiberianDawn_ClassicLanguageExtension(void)
     return EffectiveLanguage() == IPAD_EFFECTIVE_GERMAN ? "GER" : "ENG";
 }
 
+void TiberianDawn_ShowTouchControls(bool force)
+{
+    @autoreleasepool {
+        NSUserDefaults* defaults = NSUserDefaults.standardUserDefaults;
+        if (!force && [defaults boolForKey:TouchGuideShownKey]) return;
+
+        void (^present)(void) = ^{
+            UIWindowScene* scene = ActiveWindowScene();
+            if (!scene) return;
+
+            __block BOOL finished = NO;
+            UIWindow* host = [[UIWindow alloc] initWithWindowScene:scene];
+            UIViewController* controller = [UIViewController new];
+            controller.view.backgroundColor = [UIColor colorWithRed:0.035 green:0.055 blue:0.055 alpha:1.0];
+            host.rootViewController = controller;
+            host.windowLevel = UIWindowLevelAlert;
+            [host makeKeyAndVisible];
+
+            UIAlertController* alert = [UIAlertController alertControllerWithTitle:L("touch_help_title")
+                                                                            message:L("touch_help_message")
+                                                                     preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:L("ok")
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(UIAlertAction* action) {
+                finished = YES;
+            }]];
+            [controller presentViewController:alert animated:NO completion:nil];
+            UIAccessibilityPostNotification(UIAccessibilityScreenChangedNotification, alert.view);
+            while (!finished) {
+                [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                          beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+            }
+            [defaults setBool:YES forKey:TouchGuideShownKey];
+            host.hidden = YES;
+        };
+
+        if (NSThread.isMainThread) {
+            present();
+        } else {
+            dispatch_sync(dispatch_get_main_queue(), present);
+        }
+    }
+}
+
 bool TiberianDawn_PrepareGameData(void)
 {
     @autoreleasepool {
@@ -1138,6 +1237,7 @@ bool TiberianDawn_PrepareGameData(void)
         NSURL* destination = LibraryDataURL();
         if (ValidData(destination)) {
             ExcludeFromBackup(destination);
+            TiberianDawn_ShowTouchControls(false);
             return true;
         }
 
@@ -1166,6 +1266,7 @@ bool TiberianDawn_PrepareGameData(void)
                         }
                     }
                 });
+                TiberianDawn_ShowTouchControls(false);
                 return true;
             } catch (const std::exception& error) {
                 [manager removeItemAtURL:staging error:nil];
@@ -1201,6 +1302,7 @@ bool TiberianDawn_PrepareGameData(void)
                     AtomicInstall(staging, destination);
                 });
                 ShowImportCompleted();
+                TiberianDawn_ShowTouchControls(false);
                 return true;
             } catch (const std::exception& error) {
                 [manager removeItemAtURL:staging error:nil];

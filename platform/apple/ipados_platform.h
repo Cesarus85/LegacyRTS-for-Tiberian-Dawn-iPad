@@ -28,6 +28,10 @@ const char* TiberianDawn_LocalizedText(const char* key);
 const char* TiberianDawn_LanguagePreferenceLabel(void);
 const char* TiberianDawn_ClassicLanguageExtension(void);
 
+// Shows the native, localized iPad touch guide. When force is false it is
+// presented once per installation; Visual Controls can reopen it with true.
+void TiberianDawn_ShowTouchControls(bool force);
+
 #ifdef __cplusplus
 }
 #endif

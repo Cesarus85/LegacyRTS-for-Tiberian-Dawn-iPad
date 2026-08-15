@@ -1,12 +1,16 @@
-# Tiberian Dawn for iPad and macOS
+# Tiberian Dawn for iPad, macOS and Vision Pro
 
 Current release: **0.2.2** (Apple build **202**). The macOS and iPadOS bundles
 share these values from the same CMake project metadata.
 
+The current `main` source also contains the native, physical-device-tested
+visionOS prototype and the latest shared input and modern-art work. See the
+[changelog](CHANGELOG.md) for the exact source-versus-binary status.
+
 > **EA has not endorsed and does not support this product.**
 
-**Command & Conquer: Tiberian Dawn (1995), running natively on iPadOS and
-macOS** through an unofficial, community-made engine port. The project is based on
+**Command & Conquer: Tiberian Dawn (1995), running natively on iPadOS, macOS,
+and visionOS** through an unofficial, community-made engine port. The project is based on
 [Vanilla Conquer](https://github.com/TheAssemblyArmada/Vanilla-Conquer) and the
 source code released by Electronic Arts.
 
@@ -23,7 +27,7 @@ legally entitled to use.
 [Project page](https://cesarus85.github.io/Tiberian-Dawn-for-iPad-and-macOS/) · [iPad build guide](README-iPadOS.md) ·
 [macOS build guide](README-macOS.md) · [Apple-platform parity](docs/PLATFORM_PARITY.md) ·
 [Multiplayer guide](docs/MULTIPLAYER.md) · [architecture](docs/MULTIPLAYER-CONCEPT.md) · [Vision Pro build guide](README-visionOS.md) · [Vision Pro plan](docs/VISIONOS-CONCEPT.md) ·
-[Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
+[Changelog](CHANGELOG.md) · [Roadmap](IPADOS-ROADMAP.md) · [License](License.txt)
 
 ## Gameplay on iPad
 
@@ -37,8 +41,8 @@ original game data is distributed with this repository.
 ## Highlights
 
 - Native iPad window lifecycle, rotation, safe areas, and Stage Manager layout
-- Touch-first RTS controls, mouse and trackpad, hardware keyboard, controllers,
-  and Apple Pencil support
+- Touch-first RTS controls with accurate drag selection and map scrolling, plus
+  mouse, trackpad, hardware keyboard, controller, and Apple Pencil support
 - Guided on-device import of the GDI and Nod C&C Gold disc images
 - Self-contained Universal 2 macOS app for Apple Silicon and Intel, with a
   guided local two-disc importer and no Homebrew runtime dependency
@@ -47,9 +51,11 @@ original game data is distributed with this repository.
 - Built-in resolution and presentation scaler with full-size sharp and integer
   pixel-perfect modes, preserving the original 640 × 400 aspect ratio
 - Metal-accelerated SDL rendering
-- Optional modern-art mode for cursor and initial GDI/Nod units
-- AVAudioEngine audio on both platforms, with iPadOS interruption and route handling
-- Native Apple Vision Pro command-window build path (prototype; hardware acceptance pending)
+- Optional modern-art mode for the cursor, GDI/Nod infantry and early vehicles,
+  MCVs, Power Plants, Barracks/Hand of Nod, and Construction Yards
+- AVAudioEngine audio across Apple targets, with platform interruption and route handling
+- Native Apple Vision Pro command-window prototype, tested on physical hardware,
+  with gaze/pinch selection and edge/look-to-scroll control
 - Two-to-six-player cross-play over a local network or expiring private Internet rooms
 - No analytics, accounts, or advertising
 
@@ -87,10 +93,12 @@ through local ISO import, videos, menus, mouse input, campaign launch, and a liv
 mission. Both remain source-built projects rather than App Store distributions.
 
 Cross-platform multiplayer now reuses the original deterministic lockstep
-engine over direct LAN traffic or a bounded private-room TLS relay. Apple Vision Pro now has
+engine over direct LAN traffic or a bounded private-room TLS relay. Apple Vision Pro has
 an actively tested `Designed for iPad` compatibility path and a separately
-compiled native visionOS command-window prototype before optional spatial
-presentation. See the [multiplayer architecture](docs/MULTIPLAYER-CONCEPT.md)
+compiled native visionOS command-window prototype. The native target has been
+run on physical hardware with import, campaigns, modern artwork, gaze/pinch
+selection, and map scrolling; public binary distribution and longer acceptance
+testing remain open. See the [multiplayer architecture](docs/MULTIPLAYER-CONCEPT.md)
 and [Vision Pro concept](docs/VISIONOS-CONCEPT.md) for scope, milestones,
 privacy, failure policy, and release gates.
 
@@ -165,9 +173,11 @@ neighbour scaling.
 - Multiplayer is a beta. Local and private Internet play are implemented and
   compile on both Apple targets, but extended physical-device soak, hostile
   Wi-Fi, suspend/recovery and maximum-player testing remain release gates.
-- The native visionOS command-window target compiles as a prototype, but it is
-  not a released/supported port until the staged [Vision Pro plan](docs/VISIONOS-CONCEPT.md)
-  passes on a physical headset. No public visionOS download is provided yet.
+- The native visionOS command-window target is a physical-device-tested
+  prototype, not a released/supported binary. Extended comfort, lifecycle,
+  audio, and long-session acceptance remain in the staged
+  [Vision Pro plan](docs/VISIONOS-CONCEPT.md); no public visionOS download is
+  provided yet.
 - Red Alert is present in the upstream source tree but is not a supported Apple
   app target in this project.
 - External-display behavior is not release-tested.

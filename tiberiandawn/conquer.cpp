@@ -314,6 +314,11 @@ void Main_Game(int argc, char* argv[])
 #endif
         Set_Video_Cursor_Clip(false);
         InMainLoop = false;
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+        // Do not let presentation-layer sprites survive into score screens or
+        // the main menu while scenario objects are being torn down.
+        Video_Clear_HD_Artwork();
+#endif
 #ifdef IPADOS_PORT
         IPadOS_Discard_Recovery_Autosaves();
 #endif
@@ -1558,6 +1563,38 @@ static void Sync_Delay(void)
 extern void Check_For_Focus_Loss(void);
 void Reallocate_Big_Shape_Buffer(void);
 
+#ifdef IPADOS_PORT
+namespace
+{
+bool Scroll_Apple_Touch_Map(int pixel_delta_x, int pixel_delta_y)
+{
+    if (pixel_delta_x == 0 && pixel_delta_y == 0) return false;
+
+    /* The original renderer's overlapping framebuffer blit is tuned for
+    ** gradual mouse-edge scrolling. Direct manipulation can produce larger,
+    ** diagonal steps; apply those as one vector so one axis cannot overwrite
+    ** the other's pending tactical position.
+    */
+    const int pixel_distance = static_cast<int>(
+        std::round(std::sqrt(static_cast<double>(pixel_delta_x) * pixel_delta_x
+                             + static_cast<double>(pixel_delta_y) * pixel_delta_y)));
+    int lepton_distance = Pixel_To_Lepton(pixel_distance);
+    const DirType direction = static_cast<DirType>(
+        Desired_Facing256(0, 0, pixel_delta_x, pixel_delta_y));
+    if (!Map.Scroll_Map(direction, lepton_distance, true)) return false;
+
+    /* Tall buildings and terrain overlap several dirty cells. Force a clean
+    ** tactical redraw for direct touch/spatial pans instead of retaining
+    ** pixels copied from the previous viewport. This flag lasts one frame;
+    ** ordinary simulation, mouse, trackpad, and keyboard rendering keep the
+    ** classic incremental path.
+    */
+    Map.Flag_To_Redraw(true);
+    return true;
+}
+}
+#endif
+
 bool Main_Loop()
 {
     KeyNumType input; // Player input.
@@ -1587,17 +1624,33 @@ bool Main_Loop()
     float touch_pan_x = 0.0f;
     float touch_pan_y = 0.0f;
     if (Consume_IPadOS_Touch_Pan(touch_pan_x, touch_pan_y)) {
-        const int horizontal_pixels = static_cast<int>(std::round(std::abs(touch_pan_x) * SeenBuff.Get_Width()));
-        const int vertical_pixels = static_cast<int>(std::round(std::abs(touch_pan_y) * SeenBuff.Get_Height()));
-        if (horizontal_pixels > 0) {
-            int distance = Pixel_To_Lepton(horizontal_pixels);
-            Map.Scroll_Map(touch_pan_x > 0.0f ? DIR_W : DIR_E, distance, true);
-        }
-        if (vertical_pixels > 0) {
-            int distance = Pixel_To_Lepton(vertical_pixels);
-            Map.Scroll_Map(touch_pan_y > 0.0f ? DIR_N : DIR_S, distance, true);
-        }
+#if defined(VISIONOS_PORT)
+        const float touch_pan_speed = 1.0f;
+#else
+        const float touch_pan_speed = Settings.Touch.ScrollSpeed == 0
+                                          ? 0.70f
+                                          : (Settings.Touch.ScrollSpeed == 2 ? 1.40f : 1.0f);
+#endif
+        const int map_delta_x = -static_cast<int>(
+            std::round(touch_pan_x * SeenBuff.Get_Width() * touch_pan_speed));
+        const int map_delta_y = -static_cast<int>(
+            std::round(touch_pan_y * SeenBuff.Get_Height() * touch_pan_speed));
+        Scroll_Apple_Touch_Map(map_delta_x, map_delta_y);
     }
+#ifdef VISIONOS_PORT
+    float look_scroll_x = 0.0f;
+    float look_scroll_y = 0.0f;
+    if (Consume_VisionOS_Look_Scroll(look_scroll_x, look_scroll_y)) {
+        const float speed = Settings.Vision.ScrollSpeed == 0
+                                ? 0.70f
+                                : (Settings.Vision.ScrollSpeed == 2 ? 1.40f : 1.0f);
+        const int map_delta_x = static_cast<int>(
+            std::round(look_scroll_x * SeenBuff.Get_Width() * speed));
+        const int map_delta_y = static_cast<int>(
+            std::round(look_scroll_y * SeenBuff.Get_Height() * speed));
+        Scroll_Apple_Touch_Map(map_delta_x, map_delta_y);
+    }
+#endif
 #endif
 
     /*
@@ -2984,7 +3037,15 @@ int VQ_Call_Back(unsigned char*, int)
     Interpolate_2X_Scale(&SysMemPage, &SeenBuff, NULL, Settings.Video.InterpolationMode);
     Frame_Limiter();
 
-    if ((BreakoutAllowed || Debug_Flag) && key == KN_ESC) {
+    if ((BreakoutAllowed || Debug_Flag)
+        && (key == KN_ESC
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+            // Apple pointer devices do not all provide an Escape key. While
+            // this movie callback owns input, treat a primary activation from
+            // touch, Pencil, trackpad, mouse, or a visionOS pinch as Escape.
+            || static_cast<KeyNumType>(key & ~(KN_TOUCH_BIT | KN_PENCIL_BIT)) == KN_LMOUSE
+#endif
+            )) {
         Keyboard->Clear();
         Brokeout = true;
         return (true);

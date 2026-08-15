@@ -55,10 +55,12 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "gadget.h"
+#include "control.h"
 #include "filepcx.h"
 #include "wwmouse.h"
 #ifdef IPADOS_PORT
 #include "settings.h"
+#include "video.h"
 #endif
 #ifdef _WIN32
 #include <io.h>
@@ -225,10 +227,11 @@ int GadgetClass::Clicked_On(KeyNumType& key, unsigned flags, int mousex, int mou
     int hit_height = Height;
 #ifdef IPADOS_PORT
     // Finger input gets a scalable minimum target (roughly the native
-    // native 44-point iPad target after the game's 2x presentation scale).
+    // 44-point iPad target in every orientation and Stage Manager size).
     // Mouse, trackpad and Pencil hover retain pixel-precise hit testing.
-    if (key & KN_TOUCH_BIT) {
-        const int minimum = 24 * Settings.Video.TouchUIScale / 100;
+    if ((key & KN_TOUCH_BIT) && !(key & KN_PENCIL_BIT)) {
+        const int minimum = MAX(Video_Game_Pixels_For_Window_Points(44.0f),
+                                24 * Settings.Video.TouchUIScale / 100);
         if (hit_width < minimum) {
             hit_x -= (minimum - hit_width) / 2;
             hit_width = minimum;
@@ -564,7 +567,7 @@ KeyNumType GadgetClass::Input(void)
     */
     flags = 0;
     if (key) {
-        const KeyNumType button_key = static_cast<KeyNumType>(key & ~KN_TOUCH_BIT);
+        const KeyNumType button_key = static_cast<KeyNumType>(key & ~(KN_TOUCH_BIT | KN_PENCIL_BIT));
         if (button_key == KN_LMOUSE) {
             flags |= LEFTPRESS;
         }
@@ -647,6 +650,77 @@ KeyNumType GadgetClass::Input(void)
             **	processing routine.
             */
             GadgetClass* next_button = this;
+#ifdef IPADOS_PORT
+            /* Classic dialogs place controls more tightly than 44 points. For
+            ** finger input choose the nearest small control before dispatching
+            ** instead of letting linked-list order decide between overlapping
+            ** expanded targets. Large dialog/background gadgets remain the
+            ** fallback when no real control is nearby.
+            */
+            if ((key & KN_TOUCH_BIT) && !(key & KN_PENCIL_BIT) && flags) {
+                GadgetClass* best = NULL;
+                int best_priority = 4;
+                long long best_distance = 0x7FFFFFFFFFFFFFFFLL;
+                long long best_center_distance = 0x7FFFFFFFFFFFFFFFLL;
+                for (GadgetClass* candidate = this; candidate != NULL; candidate = candidate->Get_Next()) {
+                    if (candidate->IsDisabled || !(flags & candidate->Flags)) continue;
+
+                    int hit_x = candidate->X;
+                    int hit_y = candidate->Y;
+                    int hit_width = candidate->Width;
+                    int hit_height = candidate->Height;
+                    const int minimum = MAX(Video_Game_Pixels_For_Window_Points(44.0f),
+                                            24 * Settings.Video.TouchUIScale / 100);
+                    if (hit_width < minimum) {
+                        hit_x -= (minimum - hit_width) / 2;
+                        hit_width = minimum;
+                    }
+                    if (hit_height < minimum) {
+                        hit_y -= (minimum - hit_height) / 2;
+                        hit_height = minimum;
+                    }
+                    if ((unsigned)(mousex - hit_x) >= (unsigned)hit_width
+                        || (unsigned)(mousey - hit_y) >= (unsigned)hit_height) {
+                        continue;
+                    }
+
+                    const bool control = dynamic_cast<ControlClass*>(candidate) != NULL;
+                    const long long area = static_cast<long long>(candidate->Width) * candidate->Height;
+                    const int priority = control ? (area <= 16384 ? 0 : 1) : 2;
+                    const int nearest_x = mousex < candidate->X
+                                              ? candidate->X
+                                              : (mousex >= candidate->X + candidate->Width
+                                                     ? candidate->X + candidate->Width - 1
+                                                     : mousex);
+                    const int nearest_y = mousey < candidate->Y
+                                              ? candidate->Y
+                                              : (mousey >= candidate->Y + candidate->Height
+                                                     ? candidate->Y + candidate->Height - 1
+                                                     : mousey);
+                    const long long dx = mousex - nearest_x;
+                    const long long dy = mousey - nearest_y;
+                    const long long distance = dx * dx + dy * dy;
+                    const long long center_dx = mousex * 2LL - (candidate->X * 2LL + candidate->Width);
+                    const long long center_dy = mousey * 2LL - (candidate->Y * 2LL + candidate->Height);
+                    const long long center_distance = center_dx * center_dx + center_dy * center_dy;
+                    if (priority < best_priority
+                        || (priority == best_priority && distance < best_distance)
+                        || (priority == best_priority && distance == best_distance
+                            && center_distance < best_center_distance)) {
+                        best = candidate;
+                        best_priority = priority;
+                        best_distance = distance;
+                        best_center_distance = center_distance;
+                    }
+                }
+
+                if (best) {
+                    best->Draw_Me(forced);
+                    if (best->Clicked_On(key, flags, mousex, mousey)) best->Draw_Me(false);
+                    next_button = NULL;
+                }
+            }
+#endif
             while (next_button != NULL) {
 
                 /*
@@ -678,7 +752,7 @@ KeyNumType GadgetClass::Input(void)
 #ifdef IPADOS_PORT
     // The touch-source tag is internal hit-testing metadata, not an engine key
     // modifier. Never leak it into tactical or dialog command processing.
-    key = static_cast<KeyNumType>(key & ~KN_TOUCH_BIT);
+    key = static_cast<KeyNumType>(key & ~(KN_TOUCH_BIT | KN_PENCIL_BIT));
 #endif
     return (key);
 }

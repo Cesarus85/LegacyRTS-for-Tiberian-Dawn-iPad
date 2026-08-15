@@ -46,8 +46,8 @@ Implemented in the canonical physical-iPad target:
   interruptions, route/Bluetooth changes, and media-service resets.
 - Visual Controls offers full-size sharp, integer pixel-exact, or classic
   nearest-neighbour rendering, 100/125/150 percent touch UI, and a
-  large-cursor/high-contrast mode. Pinch also adjusts the touch UI scale
-  directly.
+  large-cursor/high-contrast mode. Touch scrolling and selection sensitivity
+  can be adjusted there without making pinch compete with map movement.
 - Compact Stage Manager windows show an accessible minimum-size warning.
 - A custom original AppIcon, launch color, privacy manifest, and signed
   `ipados-device-release` preset are part of the Xcode target.
@@ -207,9 +207,21 @@ classic desktop path.
 Implemented default control scheme:
 
 - Tap: select a unit or issue the normal context-sensitive command.
-- One-finger drag: begin a selection rectangle only after a 12-game-pixel
-  movement threshold, preventing hand jitter from turning taps into drags.
-- Two-finger pan: move the tactical camera.
+- One-finger drag: begin a selection rectangle only after an eight-point
+  physical movement threshold (four points for Pencil), preventing hand jitter
+  and keeping the threshold stable across resolutions and Stage Manager sizes.
+- Two-finger pan: move the tactical camera; small changes in finger spacing no
+  longer switch the gesture into pinch scaling.
+- Selection-dragging into an edge band scrolls the tactical camera, with
+  proximity-based speed and a world-anchored first selection corner.
+- Touch selection has precise, balanced, and forgiving hit-tolerance modes;
+  the active selection box is rendered in a separate presentation layer with a
+  high-contrast inset, avoiding stale framebuffer pixels while scrolling.
+- Direct touch owns the logical pointer until a real trackpad/mouse event
+  arrives. This keeps the box under the finger, hides the classic pointer during
+  touch, and clears lost mouse-button state after keyboard-dock transitions.
+- Classic menu controls expose at least 44-point touch targets and resolve
+  overlapping expanded targets to the nearest actual control.
 - Long press: secondary click, cancel, or deselect after 500 milliseconds.
 - Two-finger tap: alternative secondary click.
 - A third simultaneous touch safely cancels the current gesture.
@@ -223,8 +235,9 @@ Implemented default control scheme:
 
 Remaining work:
 
-- Pinch: initially adjust presentation or UI scale; true tactical zoom is a
-  separate engine project because the classic viewport assumes a fixed scale.
+- True tactical pinch zoom remains a separate engine project because the
+  classic viewport assumes a fixed scale. Pinch is intentionally not mapped to
+  presentation scaling so it cannot interfere with two-finger map movement.
 - Ignore or coordinate with reserved iPad system gestures.
 - Consider an optional, unobtrusive command overlay for frequent commands.
 - Validate two-finger pan, long press, cancellation, Pencil, and system-gesture
@@ -269,7 +282,8 @@ Physical-device validation matrix:
 
 Implemented for the physical iPad build:
 
-- Open the iPad on-screen keyboard when an engine edit field gains focus.
+- Open the iPad on-screen keyboard when an engine edit field gains focus,
+  including the legacy Hall-of-Fame/high-score name routine.
 - Consume UTF-8 text input events for characters while retaining physical key
   events for commands. The legacy 8-bit font path supports Latin-1, including
   German Ä/Ö/Ü/ä/ö/ü/ß; unsupported Unicode is safely ignored or folded.
@@ -290,12 +304,15 @@ Implemented for the physical iPad build:
   action buttons, guard/formation buttons, modifiers, team shortcuts, and
   trigger speed boost through the standard SDL controller mapping.
 - Draw yellow finger feedback and blue Pencil feedback without modifying the
-  original indexed framebuffer.
+  original indexed framebuffer; confirmed unit commands become a green move
+  marker or red attack crosshair.
 - Give classic controls a minimum 24-by-24 logical-pixel finger target (about
   44 iPad points at the usual presentation size) without enlarging artwork.
-- Use the tighter four-pixel drag threshold for Pencil, supported Pencil hover
-  as target preview, double-tap as secondary click, and Pencil Pro squeeze as
-  Escape/back.
+- Use the tighter four-point drag threshold and pixel-precise hit testing for
+  Pencil. Supported Pencil hover is a blue target preview that clears on hover
+  end; double-tap is the secondary click. Pencil Pro squeeze is Escape/back,
+  while holding the squeeze and moving pans the tactical map. Finger long-press
+  and 44-point target expansion do not apply to Pencil input.
 
 Remaining validation:
 
@@ -466,11 +483,17 @@ asset is also implemented:
 - Add the shared GDI/Nod E1 Minigunner as an 80-frame atlas covering ten common
   poses in eight directions. House color is applied live; rare special/death
   actions remain on the frame-accurate original sprites.
+- Add faction-specific GDI/Nod MCV atlases with eight directions plus shared
+  infrastructure atlases for the Power Plant, Barracks/Hand and Construction
+  Yard. Visibility, tactical clipping, selection and health overlays remain
+  engine-driven; construction, selling, repair, heavy damage and special states
+  retain their original frame-accurate art.
 
 Next:
 
-- Physically accept buggy scale, direction, alignment, turret tracking and house
-  colour, then use the same draw-command model for one representative building.
+- Physically accept MCV and infrastructure scale, direction, alignment, house
+  colour, visibility and overlap on iPadOS, macOS and native visionOS, then
+  extend the same authored-direction policy to the next representative unit.
 
 ### Stage 3: HD battlefield renderer
 

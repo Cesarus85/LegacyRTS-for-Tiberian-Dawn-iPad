@@ -8,7 +8,11 @@ required_assets='resources/apple/ModernArt/manifest.ini
 resources/apple/ModernArt/ui/cursor-default.png
 resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
 resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
-resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png'
+resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x-v2.png
+resources/apple/ModernArt/units/mcv/gdi-mcv-atlas-4x.png
+resources/apple/ModernArt/units/mcv/nod-mcv-atlas-4x.png
+resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-atlas-4x.png
+resources/apple/ModernArt/units/infrastructure/nod-infrastructure-atlas-4x.png'
 
 printf '%s\n' "$required_assets" | while IFS= read -r asset; do
     test -f "$asset" || { echo "Missing shared Apple asset: $asset" >&2; exit 1; }
@@ -43,6 +47,7 @@ test -f platform/apple/PrivacyInfo.xcprivacy
 test -f resources/visionos/Assets.xcassets/Contents.json
 test -s patches/SDL2-visionos.patch
 grep -q 'patches/SDL2-visionos.patch' scripts/prepare-visionos-dependencies.sh
+grep -q 'const CGRect lookScrollFrame = self.bounds' patches/SDL2-visionos.patch
 for script in scripts/prepare-visionos-dependencies.sh scripts/configure-visionos.sh \
               scripts/build-visionos-simulator.sh scripts/build-visionos-device.sh; do
     test -x "$script"

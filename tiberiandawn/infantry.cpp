@@ -639,7 +639,7 @@ void InfantryClass::Draw_It(int x, int y, WindowNumberType window)
     /*
     **	Actually draw the root body of the unit.
     */
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
     int hd_pose = -1;
     const int hd_stage = Fetch_Stage();
     switch (doit) {
@@ -680,20 +680,39 @@ void InfantryClass::Draw_It(int x, int y, WindowNumberType window)
     default:
         break;
     }
-    const bool use_hd_minigunner = *this == INFANTRY_E1 && window == WINDOW_TACTICAL
+    // The HD sprite is composited after the indexed tactical buffer, including
+    // its shroud. Only promote it while the centre cell is currently visible.
+    // When an HD-capable unit crosses that boundary, suppress its classic body
+    // as well; otherwise one legacy frame flashes between HD and the shroud.
+    const CELL hd_cell = Coord_Cell(Center_Coord());
+    const bool hd_cell_visible = Debug_Map || Debug_Unshroud
+                                 || (PlayerPtr && Is_Discovered_By_Player(PlayerPtr)
+                                     && Map[hd_cell].Is_Visible(PlayerPtr));
+    const bool hd_minigunner_capable = *this == INFANTRY_E1 && window == WINDOW_TACTICAL
+                                       && Video_Uses_HD_Minigunner_Artwork();
+    const bool use_hd_minigunner = hd_minigunner_capable
                                    && Visual_Character() == VISUAL_NORMAL && hd_pose >= 0
-                                   && Video_Uses_HD_Minigunner_Artwork();
+                                   && hd_cell_visible;
     if (use_hd_minigunner) {
         const int origin_x = WindowList[window][WINDOWX] + LogicPage->Get_XPos();
         const int origin_y = WindowList[window][WINDOWY] + LogicPage->Get_YPos();
+        // HumanShape[] maps the engine direction to the legacy SHP facing
+        // order (N, NW, W, SW, S, SE, E, NE). The HD atlas deliberately
+        // follows the normal engine order (N, NE, E, SE, S, SW, W, NW), so
+        // using facenum here mirrors every non-cardinal direction and makes
+        // infantry appear to walk backwards. Keep facenum for the original
+        // SHP renderer above, but use the actual engine facing for HD art.
+        const int hd_facing = Dir_Facing(PrimaryFacing.Current());
         Video_Set_HD_Infantry(this,
-                              hd_pose * 8 + facenum,
+                              hd_pose * 8 + hd_facing,
                               origin_x + x,
                               origin_y + y,
                               House ? House->Class->BrightColor : WHITE);
     } else {
         Video_Remove_HD_Artwork(this);
-        Techno_Draw_Object(shapefile, shapenum, x, y, window);
+        if (!hd_minigunner_capable || hd_cell_visible) {
+            Techno_Draw_Object(shapefile, shapenum, x, y, window);
+        }
     }
 #else
     Techno_Draw_Object(shapefile, shapenum, x, y, window);

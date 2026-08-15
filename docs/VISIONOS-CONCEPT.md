@@ -34,7 +34,13 @@ Input maps to the current engine coordinates:
 
 - look and pinch performs the normal primary selection at the system-delivered
   location;
-- pinch-drag performs selection rectangles and scroll interactions;
+- pinch-drag performs selection rectangles; reaching an edge keeps the
+  rectangle active and automatically scrolls the tactical map;
+- on visionOS 26 or newer, looking toward an edge of the tactical viewport
+  invokes the system's Look to Scroll behavior without a pinch;
+- a 0.4-second pinch hold in an edge band starts continuous map scrolling;
+  moving the held pinch between edge bands steers it, moving back to the center
+  pauses it, and releasing stops it;
 - a system-supported secondary gesture or an accessible native command invokes
   cancel/secondary click;
 - Bluetooth mouse, trackpad, keyboard, and supported game controllers remain
@@ -44,7 +50,20 @@ Input maps to the current engine coordinates:
 
 The app does not request raw eye-tracking data. Standard UIKit/SwiftUI focus,
 hover, and gesture delivery provides interaction while the system protects gaze
-privacy.
+privacy. “Gaze selection” therefore means look at a target and use the standard
+pinch; gaze alone never selects a unit or exposes a continuous eye coordinate
+to the engine. Look to Scroll is implemented by a UIKit scroll surface on
+visionOS 26: the system owns gaze interpretation and the engine receives only
+relative scroll deltas. The scroll surface covers the tactical viewport, not
+the sidebar or menus.
+
+Visual Controls exposes Look to Scroll, three scroll-speed levels, three edge
+band widths, and three selection-tolerance levels. Edge scrolling accelerates
+as the interaction approaches the window boundary and uses a wider exit band
+than entry band to suppress jitter. During an active selection, camera motion
+is compensated in game coordinates so the first corner remains anchored to the
+same map position. The tolerant modes add only a small selection-box margin;
+they do not change object hit testing or simulation rules.
 
 Native ornaments below or beside the game window may expose Pause, Game
 Controls, Visual Controls, keyboard/chat, and an Immersion toggle. They must not
@@ -243,8 +262,10 @@ crash, black frame, incorrect coordinates, or inaccessible exit.
 
 Current evidence: the current iPad bundle launches in Vision Simulator, uses
 the migrated local C&C Gold data, renders videos and the interrupted-mission
-dialog, and responds to hover. Simulator pinch/click translation remains under
-validation, so V0 is not yet marked complete.
+dialog, and responds to hover. The separate native app has also reached a live
+mission on physical Vision Pro. The first input mapping was rejected after that
+test because selection drag, map scrolling, and cutscene skipping were
+unreliable; it is not counted as an accepted V0/V1 input result.
 
 ### V1 — native command window
 
@@ -262,9 +283,19 @@ Implemented build foundation: `VISIONOS_PORT`, separate arm64 simulator/device
 presets, a visionOS platform boundary, clean Info.plist and resources, shared
 privacy manifest, reproducible scripts, and mandatory CI compile jobs. The V1
 behavioral gate remains open. On 14 August 2026, native arm64 simulator and
-unsigned device builds succeeded; the simulator bundle installed, launched,
-and displayed the localized importer. That is a build/startup milestone, not a
-gaze-and-pinch or physical-headset acceptance result.
+unsigned device builds succeeded, and a physical headset reached gameplay.
+Native UIKit tap/pan/long-press translation and a deterministic press/release
+state machine now replace the failed raw-pointer assumption. Automated tests
+cover taps, balanced drag completion/cancellation, all eight scroll directions,
+selection edge scrolling, hysteresis, configurable speed/edge levels,
+scroll stop/steering, secondary click, and gesture-state reset across scenario
+and modal-dialog input flushes. Physical acceptance must repeat gaze/pinch,
+multi-selection, edge scrolling, and Look to Scroll after a campaign mission
+transition and in both skirmish and multiplayer; passing only the first campaign
+mission is insufficient. A system Look to Scroll surface,
+dynamic edge speed, selection-camera compensation, and configurable selection
+tolerance are now integrated. The revised mapping still needs the
+physical-headset acceptance matrix; simulator success is not a comfort result.
 
 ### V2 — spatial interaction polish
 
@@ -327,5 +358,6 @@ Vision Pro hardware. A Simulator-only result is a prototype, not a port.
 - [Creating fully immersive experiences](https://developer.apple.com/documentation/visionos/creating-fully-immersive-experiences)
 - [Game Controller on visionOS](https://developer.apple.com/documentation/gamecontroller/discovering-game-controllers)
 - [visionOS privacy and system-provided gaze/gesture handling](https://developer.apple.com/documentation/visionos/adopting-best-practices-for-privacy)
+- [Look to Scroll in UIScrollView](https://developer.apple.com/documentation/uikit/uiscrollview/looktoscrollaxes)
 - [RealityKit spatial audio](https://developer.apple.com/documentation/realitykit/spatialaudiocomponent)
 - [Apple Vision Pro App Store compatibility](https://developer.apple.com/help/app-store-connect/manage-your-apps-availability/manage-availability-of-iphone-and-ipad-apps-on-apple-vision-pro)

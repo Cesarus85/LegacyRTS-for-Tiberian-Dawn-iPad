@@ -88,10 +88,17 @@ void ScrollClass::AI(KeyNumType& input, int x, int y)
     static DirType direction;
     bool player_scrolled = false;
 
-    /*
-	**	If rubber band mode is in progress, then don't allow scrolling of the tactical map.
-	*/
-    if (!IsRubberBand /*&& !IsTentative*/) {
+    /* Analog input is allowed to keep moving the map while a selection box is
+    ** active. This is required for spatial pinch-drag selection and also makes
+    ** controller selection consistent. Ordinary cursor-edge scrolling stays
+    ** disabled while the rubber band is active.
+    */
+#ifdef SDL2_BUILD
+    const bool analog_scroll_active = Keyboard->Is_Analog_Scroll_Active();
+#else
+    const bool analog_scroll_active = false;
+#endif
+    if (!IsRubberBand || analog_scroll_active /*&& !IsTentative*/) {
 
         /*
 		**	Special check to not scroll within the special no-scroll regions.
@@ -103,14 +110,17 @@ void ScrollClass::AI(KeyNumType& input, int x, int y)
         }
 
 #ifdef SDL2_BUILD
-        if (Keyboard->Is_Analog_Scroll_Active()) {
+        if (analog_scroll_active) {
             unsigned char scrollDirection = Keyboard->Get_Scroll_Direction();
-            int scrollDistance = (7 - Options.ScrollRate) * 20;
-            Scroll_Map((DirType)scrollDirection, scrollDistance, true);
+            float intensity = Keyboard->Get_Scroll_Intensity();
+            if (intensity < 0.15f) intensity = 0.15f;
+            if (intensity > 1.75f) intensity = 1.75f;
+            int scrollDistance = MAX(1, static_cast<int>(((7 - Options.ScrollRate) * 20 * intensity) + 0.5f));
+            player_scrolled = Scroll_Map((DirType)scrollDirection, scrollDistance, true);
         }
 #endif
 
-        if (!noscroll) {
+        if (!noscroll && !analog_scroll_active && !IsRubberBand) {
 
             /*
 			**	Verify that the mouse is over a scroll region.

@@ -367,7 +367,8 @@ bool WWKeyboardClass::Put_Element(unsigned short val)
         /* set cached down state for given key, remove all bits */
         if (DownSkip == 0 && !(val & WWKEY_TEXT_BIT)) {
             bool isDown = !(val & KN_RLSE_BIT);
-            val &= ~(KN_SHIFT_BIT | KN_CTRL_BIT | KN_ALT_BIT | KN_RLSE_BIT | KN_TOUCH_BIT | KN_TEXT_BIT | KN_BUTTON);
+            val &= ~(KN_SHIFT_BIT | KN_CTRL_BIT | KN_ALT_BIT | KN_RLSE_BIT | KN_PENCIL_BIT | KN_TOUCH_BIT
+                     | KN_TEXT_BIT | KN_BUTTON);
             Set_Bit(DownState, val, isDown);
 
             if (Is_Mouse_Key(val)) {
@@ -466,6 +467,11 @@ unsigned char WWKeyboardClass::Get_Scroll_Direction()
     return SDIR_NONE;
 }
 
+float WWKeyboardClass::Get_Scroll_Intensity()
+{
+    return 1.0f;
+}
+
 /***********************************************************************************************
  * WWKeyboardClass::Clear -- Clears the keyboard buffer.                                       *
  *                                                                                             *
@@ -500,6 +506,14 @@ void WWKeyboardClass::Clear(void)
     **  Reset all keys to not being held down to prevent stuck modifiers.
     */
     memset(DownState, '\0', sizeof(DownState));
+}
+
+void WWKeyboardClass::Reset_Mouse_Button_State(void)
+{
+    Set_Bit(DownState, KN_LMOUSE, false);
+    Set_Bit(DownState, KN_MMOUSE, false);
+    Set_Bit(DownState, KN_RMOUSE, false);
+    DownSkip = 0;
 }
 
 /***********************************************************************************************

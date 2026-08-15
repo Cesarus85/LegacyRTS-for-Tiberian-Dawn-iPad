@@ -60,7 +60,12 @@ ISArchiveV3::ISArchiveV3(const std::string& apath)
         uint16_t file_count = read<uint16_t>();
         uint16_t chunk_size = read<uint16_t>();
         std::string name = readString16();
-        fin.ignore(chunk_size - uint16_t(name.length()) - 6);
+        const std::size_t directory_record_size = name.length() + 6;
+        if (chunk_size < directory_record_size) {
+            throw std::runtime_error("Invalid InstallShield directory record size");
+        }
+        fin.ignore(static_cast<std::streamsize>(chunk_size - directory_record_size));
+        if (!fin) throw std::runtime_error("Truncated InstallShield directory record");
         directories.push_back({name, file_count});
     }
 
@@ -83,7 +88,12 @@ ISArchiveV3::ISArchiveV3(const std::string& apath)
             (void)u3;
             f.volume_start = read<uint8_t>();
             f.name = readString8();
-            fin.ignore(chunk_size - uint16_t(f.name.length()) - 30);
+            const std::size_t file_record_size = f.name.length() + 30;
+            if (chunk_size < file_record_size) {
+                throw std::runtime_error("Invalid InstallShield file record size");
+            }
+            fin.ignore(static_cast<std::streamsize>(chunk_size - file_record_size));
+            if (!fin) throw std::runtime_error("Truncated InstallShield file record");
 
             if (directory.name.length()) {
                 f.full_path = directory.name + "\\" + f.name;
@@ -92,6 +102,12 @@ ISArchiveV3::ISArchiveV3(const std::string& apath)
             }
             if (!isValidName(f.full_path)) {
                 throw std::runtime_error(std::string("Invalid file path: ") + f.full_path);
+            }
+            // Reject corrupt table entries before they reach decompression.
+            // Subtraction after the offset check avoids an integer overflow in
+            // offset + compressed_size for hostile or damaged CD archives.
+            if (f.offset > file_size || f.compressed_size > file_size - f.offset) {
+                throw std::runtime_error(std::string("File data outside archive: ") + f.full_path);
             }
 
             m_files.push_back(f);
@@ -196,20 +212,23 @@ std::vector<uint8_t> ISArchiveV3::decompress(const std::string& full_path) {
 template<class T> T ISArchiveV3::read() {
     T re;
     fin.read(reinterpret_cast<char*>(&re), sizeof(re));
+    if (!fin) throw std::runtime_error("Truncated InstallShield archive record");
     return re;
 }
 
 std::string ISArchiveV3::readString8() {
     uint8_t len = read<uint8_t>();
     std::vector<char> buf(len);
-    fin.read(&buf[0], len);
+    if (len) fin.read(buf.data(), len);
+    if (!fin) throw std::runtime_error("Truncated InstallShield string");
     return std::string(buf.begin(), buf.end());
 }
 
 std::string ISArchiveV3::readString16() {
     uint16_t len = read<uint16_t>();
     std::vector<char> buf(len);
-    fin.read(&buf[0], len);
+    if (len) fin.read(buf.data(), len);
+    if (!fin) throw std::runtime_error("Truncated InstallShield string");
     return std::string(buf.begin(), buf.end());
 }
 

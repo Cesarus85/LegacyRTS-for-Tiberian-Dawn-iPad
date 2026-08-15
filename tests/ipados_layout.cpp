@@ -60,11 +60,15 @@ int main()
     Map_IPad_Normalized_Point(landscape, 0.5f, 0.5f, game_x, game_y);
     assert(std::abs(game_x - 320) <= 1);
     assert(std::abs(game_y - 200) <= 1);
+    assert(IPad_Game_Pixels_For_Window_Points(landscape, 8.0f) == 5);
+    assert(IPad_Game_Pixels_For_Window_Points(landscape, 44.0f) == 24);
 
     IPadLayout portrait = Calculate_IPad_Layout(1668, 2420, 834, 1210, 640, 400, {0, 48, 0, 40}, false);
     Assert_Contained(portrait);
     Assert_Classic_Aspect(portrait);
     Assert_Center_Maps_To_Game_Center(portrait);
+    assert(IPad_Game_Pixels_For_Window_Points(portrait, 8.0f) == 7);
+    assert(IPad_Game_Pixels_For_Window_Points(portrait, 44.0f) == 34);
 
     IPadLayout stage_manager =
         Calculate_IPad_Layout(1000, 1400, 500, 700, 640, 400, {20, 50, 10, 30}, false);
@@ -75,6 +79,8 @@ int main()
     assert(stage_manager.compact);
     Assert_Contained(stage_manager);
     Assert_Classic_Aspect(stage_manager);
+    assert(IPad_Game_Pixels_For_Window_Points(stage_manager, 8.0f) == 11);
+    assert(IPad_Game_Pixels_For_Window_Points(stage_manager, 44.0f) == 59);
 
     Map_IPad_Output_Point(stage_manager, -100.0f, -100.0f, game_x, game_y);
     assert(game_x == 0 && game_y == 0);

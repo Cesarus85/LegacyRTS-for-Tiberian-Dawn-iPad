@@ -77,7 +77,18 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 #include "function.h"
 #include "common/fading.h"
+#ifdef IPADOS_PORT
+#include "common/settings.h"
+#endif
 #include "ccini.h"
+
+#ifdef IPADOS_PORT
+namespace
+{
+bool TouchSelectionActive = false;
+bool PencilSelectionActive = false;
+}
+#endif
 
 /*
 **	These layer control elements are used to group the displayable objects
@@ -267,6 +278,11 @@ void DisplayClass::One_Time(void)
 void DisplayClass::Init_Clear(void)
 {
     MapClass::Init_Clear();
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+    // HD sprites live in the presentation layer rather than the scenario's
+    // indexed framebuffer, so reset their retained registry explicitly.
+    Video_Clear_HD_Artwork();
+#endif
 
     /*
     ** Clear any object being placed
@@ -1570,7 +1586,21 @@ bool DisplayClass::Scroll_Map(DirType facing, int& distance, bool really)
     **	tactical map accordingly.
     */
     if (really) {
+#ifdef IPADOS_PORT
+        const int old_desired_x = Coord_X(DesiredTacticalCoord);
+        const int old_desired_y = Coord_Y(DesiredTacticalCoord);
+#endif
         Set_Tactical_Position(coord);
+#ifdef IPADOS_PORT
+        /* Keep the first corner attached to the same world position when the
+        ** camera moves underneath an active touch/spatial selection gesture.
+        ** The current corner remains attached to the finger or pinch at the edge.
+        */
+        if (IsRubberBand || IsTentative) {
+            BandX -= Lepton_To_Pixel(Coord_X(DesiredTacticalCoord) - old_desired_x);
+            BandY -= Lepton_To_Pixel(Coord_Y(DesiredTacticalCoord) - old_desired_y);
+        }
+#endif
         IsToRedraw = true;
         Flag_To_Redraw(false);
     }
@@ -2090,6 +2120,15 @@ void DisplayClass::Draw_It(bool forced)
 {
     int x, y; // Working cell index values.
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+    // Presentation-layer world artwork must obey the same tactical-window
+    // boundary as classic sprites, especially when the sidebar is open.
+    Video_Set_HD_Artwork_Clip(WindowList[WINDOW_TACTICAL][WINDOWX] + LogicPage->Get_XPos(),
+                              WindowList[WINDOW_TACTICAL][WINDOWY] + LogicPage->Get_YPos(),
+                              WindowList[WINDOW_TACTICAL][WINDOWWIDTH],
+                              WindowList[WINDOW_TACTICAL][WINDOWHEIGHT]);
+#endif
+
     MapClass::Draw_It(forced);
 
     if (IsToRedraw || forced) {
@@ -2100,6 +2139,12 @@ void DisplayClass::Draw_It(bool forced)
         **	redrawn.
         */
         Refresh_Band();
+
+#if defined(IPADOS_PORT) && !defined(VISIONOS_PORT)
+        if (!IsRubberBand || !TouchSelectionActive) {
+            Video_Set_Touch_Selection_Box(false, 0, 0, 0, 0);
+        }
+#endif
 
         /*
         ** If the multiplayer message system is displaying one or more messages,
@@ -2162,6 +2207,17 @@ void DisplayClass::Draw_It(bool forced)
                 forced = true;
             if (oldh < 1)
                 forced = true;
+
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+            // The classic framebuffer scrolls its retained centre block with a blit.
+            // Move retained HD overlays by the identical screen-space delta; a
+            // forced redraw instead rebuilds the registry from visible objects.
+            if (forced) {
+                Video_Clear_HD_Artwork();
+            } else {
+                Video_Offset_HD_World_Artwork(oldx, oldy);
+            }
+#endif
 
             /*
             ** Work out which map edges need to be redrawn
@@ -2348,6 +2404,9 @@ void DisplayClass::Draw_It(bool forced)
         **	and let the normal processing take care of the rest.
         */
         if (forced) {
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+            Video_Clear_HD_Artwork();
+#endif
             CellRedraw.Set();
         }
 
@@ -2398,7 +2457,23 @@ void DisplayClass::Draw_It(bool forced)
         **	Draw the rubber band over the top of it all.
         */
         if (IsRubberBand) {
+#if defined(IPADOS_PORT) && !defined(VISIONOS_PORT)
+            if (TouchSelectionActive) {
+                // Keep direct-touch rubber bands in the presentation layer.
+                // The classic indexed-buffer rectangle was tied to the stale
+                // trackpad cursor and could be scrolled into persistent pixels.
+                Video_Set_Touch_Selection_Box(true,
+                                              BandX + TacPixelX,
+                                              BandY + TacPixelY,
+                                              NewX + TacPixelX,
+                                              NewY + TacPixelY);
+            } else {
+                LogicPage->Draw_Rect(
+                    BandX + TacPixelX, BandY + TacPixelY, NewX + TacPixelX, NewY + TacPixelY, WHITE);
+            }
+#else
             LogicPage->Draw_Rect(BandX + TacPixelX, BandY + TacPixelY, NewX + TacPixelX, NewY + TacPixelY, WHITE);
+#endif
         }
         /*
         **	Clear the redraw flags so that normal redraw flag setting can resume.
@@ -3222,6 +3297,10 @@ int DisplayClass::TacticalClass::Action(unsigned flags, KeyNumType& key)
     bool shadow;
     ObjectClass* object = 0;
     ActionType action = ACTION_NONE; // Action possible with currently selected object.
+#ifdef IPADOS_PORT
+    const bool touch_event = (key & KN_TOUCH_BIT) != 0;
+    const bool pencil_event = (key & KN_PENCIL_BIT) != 0;
+#endif
 
     /*
     **	Set some working variables that depend on the mouse position. For the press
@@ -3345,6 +3424,10 @@ int DisplayClass::TacticalClass::Action(unsigned flags, KeyNumType& key)
         */
         if (flags & RIGHTPRESS) {
             Map.Mouse_Right_Press();
+#ifdef IPADOS_PORT
+            TouchSelectionActive = false;
+            PencilSelectionActive = false;
+#endif
         }
 
         /*
@@ -3371,7 +3454,20 @@ int DisplayClass::TacticalClass::Action(unsigned flags, KeyNumType& key)
         **	intercepted and possible rubber-band mode is flagged.
         */
         if (flags & LEFTRELEASE) {
+#ifdef IPADOS_PORT
+            if (touch_event && CurrentObject.Count()) {
+                if (action == ACTION_ATTACK) {
+                    Video_Set_Touch_Feedback_Kind(TOUCH_FEEDBACK_ATTACK);
+                } else if (action == ACTION_MOVE) {
+                    Video_Set_Touch_Feedback_Kind(TOUCH_FEEDBACK_MOVE);
+                }
+            }
+#endif
             Map.Mouse_Left_Release(cell, x, y, object, action);
+#ifdef IPADOS_PORT
+            TouchSelectionActive = false;
+            PencilSelectionActive = false;
+#endif
         }
 
         /*
@@ -3381,6 +3477,10 @@ int DisplayClass::TacticalClass::Action(unsigned flags, KeyNumType& key)
         **	held down and moved a certain minimum distance.
         */
         if (!edge && (flags & LEFTPRESS)) {
+#ifdef IPADOS_PORT
+            TouchSelectionActive = touch_event;
+            PencilSelectionActive = pencil_event;
+#endif
             Map.Mouse_Left_Press(x, y);
         }
 
@@ -3865,7 +3965,31 @@ void DisplayClass::Mouse_Left_Release(CELL cell, int x, int y, ObjectClass* obje
 
         if (IsRubberBand) {
             Refresh_Band();
+#ifdef VISIONOS_PORT
+            const int padding = Settings.Vision.SelectionTolerance == 0
+                                    ? 0
+                                    : (Settings.Vision.SelectionTolerance == 2 ? 6 : 3);
+            const int left = MIN(BandX, x) - padding;
+            const int top = MIN(BandY, y) - padding;
+            const int right = MAX(BandX, x) + padding;
+            const int bottom = MAX(BandY, y) + padding;
+            Select_These(XYPixel_Coord(left, top), XYPixel_Coord(right, bottom));
+#elif defined(IPADOS_PORT)
+            if (TouchSelectionActive && !PencilSelectionActive) {
+                const int padding = Settings.Touch.SelectionTolerance == 0
+                                        ? 0
+                                        : (Settings.Touch.SelectionTolerance == 2 ? 8 : 4);
+                const int left = MIN(BandX, x) - padding;
+                const int top = MIN(BandY, y) - padding;
+                const int right = MAX(BandX, x) + padding;
+                const int bottom = MAX(BandY, y) + padding;
+                Select_These(XYPixel_Coord(left, top), XYPixel_Coord(right, bottom));
+            } else {
+                Select_These(XYPixel_Coord(BandX, BandY), XYPixel_Coord(x, y));
+            }
+#else
             Select_These(XYPixel_Coord(BandX, BandY), XYPixel_Coord(x, y));
+#endif
 
             Set_Default_Mouse(MOUSE_NORMAL, wwsmall);
 #ifdef NEVER
@@ -4059,7 +4183,16 @@ void DisplayClass::Mouse_Left_Held(int x, int y)
             **	The mouse must have moved a minimum distance before rubber band mode can be
             **	initiated.
             */
-            if (ABS(x - BandX) > 4 || ABS(y - BandY) > 4) {
+#ifdef VISIONOS_PORT
+            const int drag_threshold = Settings.Vision.SelectionTolerance == 0
+                                           ? 3
+                                           : (Settings.Vision.SelectionTolerance == 2 ? 5 : 4);
+#elif defined(IPADOS_PORT)
+            const int drag_threshold = TouchSelectionActive && !PencilSelectionActive ? 2 : 4;
+#else
+            const int drag_threshold = 4;
+#endif
+            if (ABS(x - BandX) > drag_threshold || ABS(y - BandY) > drag_threshold) {
                 IsRubberBand = true;
                 x = Bound(x, 0, Lepton_To_Pixel(TacLeptonWidth) - 1);
                 y = Bound(y, 0, Lepton_To_Pixel(TacLeptonHeight) - 1);

@@ -50,6 +50,10 @@
 #include "common/framelimit.h"
 #include "common/settings.h"
 #include "endianness.h"
+#ifdef IPADOS_PORT
+#include "video.h"
+#include <SDL.h>
+#endif
 
 #define SCORETEXT_X 184
 #define SCORETEXT_Y 8
@@ -1613,6 +1617,15 @@ void ScoreClass::Input_Name(char str[], int xpos, int ypos, char const pal[])
 
     void const* keystrok = MFCD::Retrieve("KEYSTROK.AUD");
 
+#ifdef IPADOS_PORT
+    // The Hall-of-Fame name entry predates EditClass and therefore never
+    // entered SDL text-input mode. Give it the shared UIKit text-input
+    // contract used by iPadOS and native visionOS, with the candidate row as
+    // the keyboard-avoidance rectangle.
+    Set_IPadOS_Text_Input_Rect(xpos, ypos, (MAX_FAMENAME_LENGTH - 1) * 6, 8);
+    SDL_StartTextInput();
+#endif
+
     /*
     ** Ready the hidpage so it can restore background under zoomed letters
     */
@@ -1631,6 +1644,16 @@ void ScoreClass::Input_Name(char str[], int xpos, int ypos, char const pal[])
 
         if (Keyboard->Check()) {
             key = Keyboard->Get();
+
+#ifdef IPADOS_PORT
+            if (static_cast<KeyNumType>(key & ~(KN_TOUCH_BIT | KN_PENCIL_BIT)) == KN_LMOUSE) {
+                // Reopen the software keyboard if the player dismissed it and
+                // taps the visible Hall-of-Fame entry again.
+                Set_IPadOS_Text_Input_Rect(xpos, ypos, (MAX_FAMENAME_LENGTH - 1) * 6, 8);
+                SDL_StartTextInput();
+                key = KN_NONE;
+            }
+#endif
 
             if (index == MAX_FAMENAME_LENGTH - 2) {
                 while (Keyboard->Check()) {
@@ -1687,6 +1710,10 @@ void ScoreClass::Input_Name(char str[], int xpos, int ypos, char const pal[])
 
         Frame_Limiter();
     } while (key != KN_RETURN && key != KN_KEYPAD_RETURN);
+
+#ifdef IPADOS_PORT
+    SDL_StopTextInput();
+#endif
 }
 
 void Animate_Cursor(int pos, int ypos)

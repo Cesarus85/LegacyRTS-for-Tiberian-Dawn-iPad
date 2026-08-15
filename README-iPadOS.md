@@ -193,8 +193,25 @@ vehicle path. Both vehicle atlases now define the circular weapon-mount pivot
 explicitly, preventing long asymmetric gun barrels from moving the turret off
 center while it turns. The shared GDI/Nod E1 Minigunner uses an 80-frame atlas:
 ten standing, walking, firing, prone, crawling, and transition poses across all
-eight facings. Runtime house-color tinting differentiates the factions. Rare
-special/death actions automatically retain their frame-accurate original art.
+eight facings. Version 2 uses five genuinely authored world-space views and
+three mirrored counterparts instead of rotating one bitmap, so east/west
+movement remains visibly upright rather than resembling crawling. Runtime
+house-color tinting differentiates the factions. Rare special/death actions
+automatically retain their frame-accurate original art. Future replacement-art
+requirements are documented in `docs/MODERN-ART-ASSETS.md`.
+
+The same shared renderer now provides separate GDI and Nod artwork for the
+MCV, power plant, infantry-production building (Barracks or Hand) and deployed
+Construction Yard. MCVs use eight authored or mirrored directions. Buildings
+remain in the modern style while being constructed, sold, damaged and repaired:
+the engine's real build stage drives a bottom-up assembly effect, while damage
+and repair are conveyed continuously by the Metal renderer. Construction Yards
+also retain modern artwork during production through 20 crane phases; infantry
+production uses ten modern door/light phases. Unsupported special states still
+retain their frame-correct original art. Fog of War, tactical
+clipping, scrolling, modal menus, selection frames and health bars follow the
+same rules as the classic sprites. These assets and fallbacks are identical in
+the iPadOS, macOS and visionOS builds.
 
 ## Physical-device status
 
@@ -300,22 +317,41 @@ in-game save slots for that purpose.
 - Two-finger drag: pan the tactical map
 - Long press: secondary click/cancel/deselect
 - Two-finger tap: alternative secondary click
-- Apple Pencil: precise primary selection
-- Apple Pencil hover: blue target preview on supported iPads
-- Apple Pencil double-tap: secondary click/cancel; Pencil Pro squeeze: back
+- Apple Pencil: pixel-precise primary selection without finger-sized hit expansion
+- Apple Pencil hover: blue target preview on supported iPads, cleared as soon
+  as the Pencil leaves hover range
+- Apple Pencil double-tap: secondary click/cancel
+- Apple Pencil Pro squeeze: back; keep squeezing and move to pan the map
 - Bluetooth/USB mouse and trackpad: absolute hover, left/right/middle click,
   drag, and wheel scrolling through the adaptive viewport transform
-- On-screen keyboard: opens automatically for editable text fields
+- On-screen keyboard: opens automatically for editable text fields, including
+  the Hall-of-Fame/high-score name after a mission
 - Hardware keyboard: active system layout for text, physical keys for commands
 - Controller: automatically detected; left stick moves the pointer, right stick
   pans, A/Cross selects, B/Circle cancels, X/Square guards, Y/Triangle forms
 - `Game Controls > Controller layout`: labels matched to Xbox, PlayStation, or
   Nintendo controllers
 
-Finger taps show a yellow ring, Pencil input a smaller blue ring, and classic
-controls receive enlarged invisible finger hit regions. Interrupted or
-cancelled gestures release any held selection button. Pinch adjusts the touch
-UI between 100 and 150 percent. Visual Controls offers three GPU presentation
+Finger taps show a yellow ring, Pencil input a smaller blue ring, and issued
+unit commands replace it briefly with a green move marker or red attack
+crosshair. Classic
+controls receive resolution-independent 44-point finger targets. Where those
+targets overlap, the nearest actual control wins instead of linked-list order.
+Interrupted or cancelled gestures release any held selection button. One-finger
+terrain drags select units, two-finger drags move the map, and holding an active
+selection at an edge keeps scrolling. Pinch no longer competes with map movement;
+Pencil input deliberately has no finger long-press gesture: double-tap remains
+the precise secondary action and Pencil Pro squeeze owns back/panning.
+UI scale remains selectable between 100 and 150 percent in Visual Controls.
+Direct-touch selection boxes are composited above the game framebuffer so they
+stay under the finger without leaving pixels behind during map movement. The
+two-finger pan applies diagonal motion as one map vector and rebuilds the
+tactical surface for that frame, preventing retained fragments from tall
+buildings and terrain. The
+first touch after attaching or detaching a keyboard/trackpad also clears stale
+pointer-button state, and the classic pointer is hidden while touch is active.
+The same screen offers touch scroll speed, edge scrolling, selection tolerance,
+and a localized control guide. Visual Controls also offers three GPU presentation
 modes: `Sharp` is the default full-size mode with display-pixel-sized edge
 transitions; `Pixel exact` uses integer scaling; and `Classic` preserves
 fractional nearest-neighbour scaling. The same screen also offers a

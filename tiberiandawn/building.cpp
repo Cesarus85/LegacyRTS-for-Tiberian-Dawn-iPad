@@ -635,11 +635,102 @@ void BuildingClass::Draw_It(int x, int y, WindowNumberType window)
         }
     }
 
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+    /*
+    ** The optional high-resolution infrastructure remains active through
+    ** construction, selling, damage and repair. The renderer derives those
+    ** presentation states from engine progress and health, while simulation and
+    ** the original shapes remain authoritative. Since the sprites are composited
+    ** above the tactical buffer and its shroud, only register one while the local
+    ** player can currently see the building's center cell.
+    */
+    const bool hd_building_type = *this == STRUCT_POWER || *this == STRUCT_BARRACKS
+                                  || *this == STRUCT_HAND || *this == STRUCT_CONST;
+    const bool hd_building_is_nod = House && House->ActLike == HOUSE_BAD;
+    const CELL hd_cell = Coord_Cell(Center_Coord());
+    const bool hd_cell_revealed = Debug_Map || Debug_Unshroud
+                                  || (PlayerPtr && Is_Discovered_By_Player(PlayerPtr)
+                                      && Map[hd_cell].Is_Mapped(PlayerPtr));
+    int hd_completion = 255;
+    if (BState == BSTATE_CONSTRUCTION) {
+        const BuildingTypeClass::AnimControlType* control = Fetch_Anim_Control();
+        const int count = MAX(control->Count, 1);
+        const int completed = Bound(Fetch_Stage() - control->Start + 1, 0, count);
+        hd_completion = (completed * 255) / count;
+        if (Mission == MISSION_DECONSTRUCTION) {
+            hd_completion = 255 - hd_completion;
+        }
+    }
+    const unsigned hd_health = MIN((unsigned)0x0100, Health_Ratio());
+    const int hd_damage = 255 - (int)((hd_health * 255) / 0x0100);
+    int hd_activity_frame = -1;
+    const bool hd_activity_artwork = Video_Uses_HD_Infrastructure_Activity_Artwork(hd_building_is_nod);
+    const bool hd_activity_supported = BState == BSTATE_ACTIVE && hd_activity_artwork
+                                       && (*this == STRUCT_CONST || *this == STRUCT_BARRACKS
+                                           || *this == STRUCT_HAND);
+    if (hd_activity_supported) {
+        const BuildingTypeClass::AnimControlType* control = Fetch_Anim_Control();
+        if (*this == STRUCT_CONST) {
+            hd_activity_frame = Bound(Fetch_Stage() - control->Start, 0, 19);
+        } else {
+            const int phase = control->Count > 1
+                                  ? Bound(Fetch_Stage() - control->Start, 0, 9)
+                                  : (Frame / 3) % 10;
+            hd_activity_frame = 20 + phase;
+        }
+    }
+    const bool hd_building_state_supported = (BState == BSTATE_CONSTRUCTION || BState == BSTATE_IDLE
+                                              || hd_activity_supported)
+                                             && Strength > 0;
+    const bool use_hd_building = hd_building_type && window == WINDOW_TACTICAL
+                                 && Visual_Character() == VISUAL_NORMAL
+                                 && Video_Uses_HD_Infrastructure_Artwork(hd_building_is_nod)
+                                 && hd_cell_revealed && hd_building_state_supported;
+
+    if (hd_building_type && window == WINDOW_TACTICAL && !use_hd_building) {
+        Video_Remove_HD_Artwork(this);
+    }
+#endif
+
     /*
     **	Actually draw the building shape.
     */
     IsTheaterShape = Class->IsTheater;
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+    if (!use_hd_building) {
+        Techno_Draw_Object(shapefile, shapenum, x, y, window);
+    } else {
+        int hd_frame = 0;
+        int hd_width = 48;
+        int hd_height = 48;
+
+        if (*this == STRUCT_BARRACKS || *this == STRUCT_HAND) {
+            hd_frame = 1;
+            hd_height = hd_building_is_nod ? 64 : 48;
+        } else if (*this == STRUCT_CONST) {
+            hd_frame = 2;
+            hd_width = 72;
+            hd_height = 56;
+        }
+
+        const int origin_x = WindowList[window][WINDOWX] + LogicPage->Get_XPos();
+        const int origin_y = WindowList[window][WINDOWY] + LogicPage->Get_YPos();
+        Video_Set_HD_Building(this,
+                              hd_building_is_nod ? 1 : 0,
+                              hd_frame,
+                              hd_activity_frame,
+                              origin_x + x,
+                              origin_y + y,
+                              hd_width,
+                              hd_height,
+                              hd_completion,
+                              hd_damage,
+                              IsRepairing && IsWrenchVisible,
+                              House ? House->Class->BrightColor : WHITE);
+    }
+#else
     Techno_Draw_Object(shapefile, shapenum, x, y, window);
+#endif
     IsTheaterShape = false;
 
     /*
