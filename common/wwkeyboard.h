@@ -843,6 +843,9 @@ typedef enum KeyNumType : unsigned short
     KN_CTRL_BIT = WWKEY_CTRL_BIT,
     KN_ALT_BIT = WWKEY_ALT_BIT,
     KN_RLSE_BIT = WWKEY_RLS_BIT,
+    // Direct Apple Pencil input remains tagged as touch for the compositor,
+    // while this source bit keeps its hit testing pixel precise.
+    KN_PENCIL_BIT = WWKEY_VK_BIT,
     KN_TOUCH_BIT = WWKEY_DBL_BIT,
     KN_TEXT_BIT = WWKEY_TEXT_BIT,
     KN_BUTTON = WWKEY_BTN_BIT,
@@ -876,7 +879,8 @@ public:
     KeyNumType Check(void) const;
     KeyNumType Get(void);
     bool Put(unsigned short key);
-    void Clear(void);
+    virtual void Clear(void);
+    void Reset_Mouse_Button_State(void);
     virtual KeyASCIIType To_ASCII(unsigned short num) = 0;
     bool Down(unsigned short key);
 
@@ -885,6 +889,7 @@ public:
     virtual void Close_Controller();
     virtual bool Is_Analog_Scroll_Active();
     virtual unsigned char Get_Scroll_Direction();
+    virtual float Get_Scroll_Intensity();
 
 #if defined(_WIN32) && !defined(SDL_BUILD)
     /* Define the main hook for the message processing loop.					*/

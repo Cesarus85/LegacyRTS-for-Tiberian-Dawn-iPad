@@ -1,32 +1,32 @@
-# Generation prompt
+# Directional generation prompt
 
+Run the following template once for each authored facing: `N`, `NE`, `E`, `SE`
+and `S`. Supply the accepted neighbouring sheet as a visual consistency
+reference. The builder mirrors `SE`, `E` and `NE` for the remaining directions.
+
+```text
 Use case: stylized-concept
+Asset type: production pose master sheet for one HD RTS infantry facing
+Primary request: Preserve the same original generic helmeted rifle soldier,
+equipment, colors, proportions, painterly realism, scale and lighting as the
+reference. Create exactly ten isolated full-body versions in a strict 5-column
+by 2-row grid. In every pose the soldier's BODY faces world-space <DIRECTION>
+under a fixed orthographic overhead RTS camera. Rotate the actual soldier around
+the vertical body/world axis; never rotate or tilt the 2D image. Upright poses
+keep the head above the torso and boots below the torso.
+Pose order: top row is standing alert, walking left stride, walking
+passing/neutral, walking right stride and controlled standing rifle fire.
+Bottom row is prone aiming, crawl left, crawl neutral, crawl right and crouched
+transition between standing and prone.
+Scene/background: flat uniform #ff00ff chroma-key background; no floor or
+shadows; equal cells, consistent scale and ground anchor, generous padding.
+Style: polished hand-painted RTS sprite, crisp realistic detail and a readable
+silhouette at tiny size. Charcoal, muted olive, warm gray and pale neutral
+team-color panels; no magenta on the soldier.
+Constraints: exactly 5 columns and 2 rows; same soldier and rifle throughout;
+no missing/extra figures, overlap, grid lines, text, labels, logos, insignia,
+blood, muzzle flash, smoke, scenery, shadows or watermark.
+```
 
-Asset type: production pose master sheet for a high-resolution real-time
-strategy infantry sprite atlas
-
-Primary request: Create a consistent pose sheet of one original
-late-20th-century generic rifle infantry soldier, designed to serve both
-factions through later runtime team-color tinting. Show exactly ten separate
-full-body versions of the same soldier in a strict 5-column by 2-row grid.
-Top row: standing alert, walking left stride, walking neutral, walking right
-stride, and firing with controlled recoil. Bottom row: prone aiming, three
-crawling phases, and a crouched transition to prone. Every pose faces the top
-and uses the same orthographic 65-degree overhead RTS camera, character scale,
-equipment, proportions, materials, and lighting.
-
-Subject: helmeted generic soldier with compact body armor, small backpack,
-boots, and a conventional rifle; no faction or real-world insignia.
-
-Scene/backdrop: perfectly flat uniform `#ff00ff` chroma-key background, no floor
-plane; generous padding and no pose overlap.
-
-Style/medium: polished hand-painted RTS infantry sprite master, crisp realistic
-military detail, readable silhouette at tiny size, original generic design.
-
-Color palette: charcoal, muted olive, warm gray, and pale neutral shoulder/chest
-panels for runtime team-color tinting; no red or magenta object colors.
-
-Constraints: exactly ten isolated poses in the specified order; same soldier
-and equipment in every cell; no shadows, blood, muzzle flash, smoke, scenery,
-grid lines, text, logos, or watermark. Uniform key background.
+The non-negotiable rule for infantry is that the camera never rotates with the
+character. This keeps every standing and walking facing visually upright.

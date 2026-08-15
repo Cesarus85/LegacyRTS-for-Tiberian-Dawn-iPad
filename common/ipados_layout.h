@@ -47,4 +47,9 @@ void Map_IPad_Normalized_Point(const IPadLayout& layout,
                                int& game_x,
                                int& game_y);
 
+// Converts a physical UIKit/AppKit point size into logical game pixels for the
+// current fitted viewport. This keeps finger slop and hit targets ergonomic
+// across Retina scale, rotation, and Stage Manager window sizes.
+int IPad_Game_Pixels_For_Window_Points(const IPadLayout& layout, float points);
+
 #endif

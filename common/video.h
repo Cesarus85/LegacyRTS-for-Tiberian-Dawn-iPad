@@ -66,14 +66,25 @@ void Set_Video_Cursor_Clip(bool clipped);
 void Move_Video_Mouse(float xrel, float yrel);
 void Get_Video_Mouse(int& x, int& y);
 void Refresh_Video_Layout();
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
 void Set_Video_Mouse_Window(float window_x, float window_y, int& game_x, int& game_y);
 #endif
 #if defined(IPADOS_PORT) || defined(MACOS_PORT)
 void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& game_x, int& game_y);
+int Video_Game_Pixels_For_Window_Points(float points);
 void Set_Video_Render_Active(bool active);
 void Video_Record_Input_Timestamp(uint32_t timestamp_ms);
 void Video_Set_Touch_Feedback(int game_x, int game_y, bool pencil, bool released);
+enum TouchFeedbackKind
+{
+    TOUCH_FEEDBACK_NEUTRAL = 0,
+    TOUCH_FEEDBACK_MOVE = 1,
+    TOUCH_FEEDBACK_ATTACK = 2,
+};
+void Video_Set_Touch_Feedback_Kind(TouchFeedbackKind kind);
+void Video_Clear_Touch_Feedback(void);
+void Video_Set_Touch_Input(bool touch_input);
+void Video_Set_Touch_Selection_Box(bool active, int x1, int y1, int x2, int y2);
 // 0 = original/action cursor, 1 = normal pointer eligible for HD artwork.
 void Video_Set_Cursor_Kind(int kind);
 void Video_Set_Selection_Overlay(const void* object,
@@ -89,6 +100,7 @@ void Video_Set_HD_Buggy_Component(const void* object,
                                   int center_x,
                                   int center_y,
                                   unsigned char palette_index);
+// vehicle_kind: 0 = Nod buggy, 1 = GDI Humvee, 2 = GDI MCV, 3 = Nod MCV.
 void Video_Set_HD_Vehicle_Component(const void* object,
                                     int vehicle_kind,
                                     int component,
@@ -101,6 +113,21 @@ void Video_Set_HD_Infantry(const void* object,
                            int center_x,
                            int center_y,
                            unsigned char palette_index);
+// faction_kind: 0 = GDI, 1 = Nod. frame: 0 = power plant,
+// 1 = infantry production, 2 = construction yard. activity_frame is -1 for
+// static art, 0..19 for the yard and 20..29 for infantry production.
+void Video_Set_HD_Building(const void* object,
+                           int faction_kind,
+                           int frame,
+                           int activity_frame,
+                           int center_x,
+                           int center_y,
+                           int width,
+                           int height,
+                           int completion,
+                           int damage,
+                           bool repairing,
+                           unsigned char palette_index);
 void Video_Set_HD_Health(const void* object,
                          bool visible,
                          int x,
@@ -108,10 +135,17 @@ void Video_Set_HD_Health(const void* object,
                          int width,
                          int fill_width,
                          unsigned char palette_index);
+void Video_Set_HD_Artwork_Clip(int x, int y, int width, int height);
+void Video_Set_HD_World_Artwork_Visible(bool visible);
+void Video_Offset_HD_World_Artwork(int x, int y);
 void Video_Remove_HD_Artwork(const void* object);
+void Video_Clear_HD_Artwork();
 bool Video_Uses_HD_Buggy_Artwork();
 bool Video_Uses_HD_Humvee_Artwork();
 bool Video_Uses_HD_Minigunner_Artwork();
+bool Video_Uses_HD_MCV_Artwork(bool nod);
+bool Video_Uses_HD_Infrastructure_Artwork(bool nod);
+bool Video_Uses_HD_Infrastructure_Activity_Artwork(bool nod);
 bool Video_Uses_Modern_Artwork();
 void Set_IPadOS_Text_Input_Rect(int game_x, int game_y, int game_w, int game_h);
 int Video_Get_Effective_Frame_Limit();

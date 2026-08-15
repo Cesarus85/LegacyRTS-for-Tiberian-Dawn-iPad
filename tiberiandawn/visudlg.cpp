@@ -40,6 +40,9 @@
 #if defined(IPADOS_PORT) || defined(MACOS_PORT)
 #include "common/settings.h"
 #include "common/video.h"
+#ifdef VISIONOS_PORT
+#include "common/ipados_touch.h"
+#endif
 #ifdef IPADOS_PORT
 #include "platform/apple/ipados_platform.h"
 #else
@@ -67,6 +70,13 @@ const char* Artwork_Mode_Text(int mode)
 {
     return TiberianDawn_LocalizedText(mode == 1 ? "visual_artwork_modern" : "visual_artwork_original");
 }
+
+const char* Three_Level_Text(int level, const char* low, const char* high)
+{
+    if (level == 0) return TiberianDawn_LocalizedText(low);
+    if (level == 2) return TiberianDawn_LocalizedText(high);
+    return TiberianDawn_LocalizedText("vision_level_balanced");
+}
 }
 #endif
 
@@ -75,7 +85,9 @@ int VisualControlsClass::Init(void)
     int factor = (SeenBuff.Get_Width() == 320) ? 1 : 2;
     Option_Width = 216 * factor;
     Option_Height =
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#ifdef IPADOS_PORT
+        196 * factor;
+#elif defined(IPADOS_PORT) || defined(MACOS_PORT)
         160 * factor;
 #else
         122 * factor;
@@ -91,7 +103,9 @@ int VisualControlsClass::Init(void)
     Slider_Y_Spacing = 11 * factor;
     Button_X = Option_X + (63 * factor);
     Button_Y = Option_Y + (
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#ifdef IPADOS_PORT
+        176
+#elif defined(IPADOS_PORT) || defined(MACOS_PORT)
         140
 #else
         102
@@ -192,6 +206,107 @@ void VisualControlsClass::Process(void)
                                      Option_Y + 94 * factor,
                                      88 * factor,
                                      11 * factor);
+#if defined(IPADOS_PORT) && !defined(VISIONOS_PORT)
+    char touch_edge_text[48];
+    char touch_scroll_text[48];
+    char touch_selection_text[48];
+    std::snprintf(touch_edge_text,
+                  sizeof(touch_edge_text),
+                  TiberianDawn_LocalizedText("touch_edge_scroll_format"),
+                  TiberianDawn_LocalizedText(Settings.Touch.EdgeScroll ? "state_on" : "state_off"));
+    std::snprintf(touch_scroll_text,
+                  sizeof(touch_scroll_text),
+                  TiberianDawn_LocalizedText("touch_scroll_speed_format"),
+                  Three_Level_Text(Settings.Touch.ScrollSpeed, "vision_level_slow", "vision_level_fast"));
+    std::snprintf(touch_selection_text,
+                  sizeof(touch_selection_text),
+                  TiberianDawn_LocalizedText("touch_selection_format"),
+                  Three_Level_Text(Settings.Touch.SelectionTolerance,
+                                   "vision_level_precise",
+                                   "vision_level_forgiving"));
+    TextButtonClass touchedgebtn(BUTTON_IPAD_TOUCH_EDGE_SCROLL,
+                                 touch_edge_text,
+                                 TPF_6PT_GRAD | TPF_NOSHADOW,
+                                 Option_X + 15 * factor,
+                                 Option_Y + 110 * factor,
+                                 88 * factor,
+                                 11 * factor);
+    TextButtonClass touchscrollbtn(BUTTON_IPAD_TOUCH_SCROLL_SPEED,
+                                   touch_scroll_text,
+                                   TPF_6PT_GRAD | TPF_NOSHADOW,
+                                   Option_X + 113 * factor,
+                                   Option_Y + 110 * factor,
+                                   88 * factor,
+                                   11 * factor);
+    TextButtonClass touchselectionbtn(BUTTON_IPAD_TOUCH_SELECTION_TOLERANCE,
+                                      touch_selection_text,
+                                      TPF_6PT_GRAD | TPF_NOSHADOW,
+                                      Option_X + 15 * factor,
+                                      Option_Y + 126 * factor,
+                                      88 * factor,
+                                      11 * factor);
+    TextButtonClass touchhelpbtn(BUTTON_IPAD_TOUCH_HELP,
+                                 TiberianDawn_LocalizedText("touch_help_button"),
+                                 TPF_6PT_GRAD | TPF_NOSHADOW,
+                                 Option_X + 113 * factor,
+                                 Option_Y + 126 * factor,
+                                 88 * factor,
+                                 11 * factor);
+#endif
+#ifdef VISIONOS_PORT
+    char look_scroll_text[48];
+    char scroll_speed_text[48];
+    char edge_sensitivity_text[48];
+    char selection_tolerance_text[48];
+    std::snprintf(look_scroll_text,
+                  sizeof(look_scroll_text),
+                  TiberianDawn_LocalizedText("vision_look_scroll_format"),
+                  TiberianDawn_LocalizedText(Settings.Vision.LookToScroll ? "state_on" : "state_off"));
+    std::snprintf(scroll_speed_text,
+                  sizeof(scroll_speed_text),
+                  TiberianDawn_LocalizedText("vision_scroll_speed_format"),
+                  Three_Level_Text(
+                      Settings.Vision.ScrollSpeed, "vision_level_slow", "vision_level_fast"));
+    std::snprintf(edge_sensitivity_text,
+                  sizeof(edge_sensitivity_text),
+                  TiberianDawn_LocalizedText("vision_edge_format"),
+                  Three_Level_Text(
+                      Settings.Vision.EdgeSensitivity, "vision_level_narrow", "vision_level_wide"));
+    std::snprintf(selection_tolerance_text,
+                  sizeof(selection_tolerance_text),
+                  TiberianDawn_LocalizedText("vision_selection_format"),
+                  Three_Level_Text(Settings.Vision.SelectionTolerance,
+                                          "vision_level_precise",
+                                          "vision_level_forgiving"));
+    TextButtonClass lookscrollbtn(BUTTON_VISION_LOOK_SCROLL,
+                                  look_scroll_text,
+                                  TPF_6PT_GRAD | TPF_NOSHADOW,
+                                  Option_X + 15 * factor,
+                                  Option_Y + 110 * factor,
+                                  88 * factor,
+                                  11 * factor);
+    TextButtonClass scrollspeedbtn(BUTTON_VISION_SCROLL_SPEED,
+                                   scroll_speed_text,
+                                   TPF_6PT_GRAD | TPF_NOSHADOW,
+                                   Option_X + 113 * factor,
+                                   Option_Y + 110 * factor,
+                                   88 * factor,
+                                   11 * factor);
+    TextButtonClass edgebtn(BUTTON_VISION_EDGE_SENSITIVITY,
+                            edge_sensitivity_text,
+                            TPF_6PT_GRAD | TPF_NOSHADOW,
+                            Option_X + 15 * factor,
+                            Option_Y + 126 * factor,
+                            88 * factor,
+                            11 * factor);
+    TextButtonClass selectionbtn(BUTTON_VISION_SELECTION_TOLERANCE,
+                                 selection_tolerance_text,
+                                 TPF_6PT_GRAD | TPF_NOSHADOW,
+                                 Option_X + 113 * factor,
+                                 Option_Y + 126 * factor,
+                                 88 * factor,
+                                 11 * factor);
+#endif
 #endif
 
     /*
@@ -206,6 +321,18 @@ void VisualControlsClass::Process(void)
     scalebtn.Add_Tail(optionsbtn);
     artworkbtn.Add_Tail(optionsbtn);
     accessibilitybtn.Add_Tail(optionsbtn);
+#if defined(IPADOS_PORT) && !defined(VISIONOS_PORT)
+    touchedgebtn.Add_Tail(optionsbtn);
+    touchscrollbtn.Add_Tail(optionsbtn);
+    touchselectionbtn.Add_Tail(optionsbtn);
+    touchhelpbtn.Add_Tail(optionsbtn);
+#endif
+#ifdef VISIONOS_PORT
+    lookscrollbtn.Add_Tail(optionsbtn);
+    scrollspeedbtn.Add_Tail(optionsbtn);
+    edgebtn.Add_Tail(optionsbtn);
+    selectionbtn.Add_Tail(optionsbtn);
+#endif
 #endif
 
     /*
@@ -405,6 +532,95 @@ void VisualControlsClass::Process(void)
             accessibilitybtn.Flag_To_Redraw();
             Refresh_Video_Layout();
             break;
+#if defined(IPADOS_PORT) && !defined(VISIONOS_PORT)
+        case (BUTTON_IPAD_TOUCH_EDGE_SCROLL | KN_BUTTON):
+            Settings.Touch.EdgeScroll = !Settings.Touch.EdgeScroll;
+            std::snprintf(touch_edge_text,
+                          sizeof(touch_edge_text),
+                          TiberianDawn_LocalizedText("touch_edge_scroll_format"),
+                          TiberianDawn_LocalizedText(Settings.Touch.EdgeScroll ? "state_on" : "state_off"));
+            touchedgebtn.Set_Text(touch_edge_text, false);
+            touchedgebtn.Flag_To_Redraw();
+            break;
+
+        case (BUTTON_IPAD_TOUCH_SCROLL_SPEED | KN_BUTTON):
+            Settings.Touch.ScrollSpeed = (Settings.Touch.ScrollSpeed + 1) % 3;
+            std::snprintf(touch_scroll_text,
+                          sizeof(touch_scroll_text),
+                          TiberianDawn_LocalizedText("touch_scroll_speed_format"),
+                          Three_Level_Text(Settings.Touch.ScrollSpeed,
+                                           "vision_level_slow",
+                                           "vision_level_fast"));
+            touchscrollbtn.Set_Text(touch_scroll_text, false);
+            touchscrollbtn.Flag_To_Redraw();
+            break;
+
+        case (BUTTON_IPAD_TOUCH_SELECTION_TOLERANCE | KN_BUTTON):
+            Settings.Touch.SelectionTolerance = (Settings.Touch.SelectionTolerance + 1) % 3;
+            std::snprintf(touch_selection_text,
+                          sizeof(touch_selection_text),
+                          TiberianDawn_LocalizedText("touch_selection_format"),
+                          Three_Level_Text(Settings.Touch.SelectionTolerance,
+                                           "vision_level_precise",
+                                           "vision_level_forgiving"));
+            touchselectionbtn.Set_Text(touch_selection_text, false);
+            touchselectionbtn.Flag_To_Redraw();
+            break;
+
+        case (BUTTON_IPAD_TOUCH_HELP | KN_BUTTON):
+            TiberianDawn_ShowTouchControls(true);
+            Keyboard->Clear();
+            display = true;
+            partial = true;
+            break;
+#endif
+#ifdef VISIONOS_PORT
+        case (BUTTON_VISION_LOOK_SCROLL | KN_BUTTON):
+            Settings.Vision.LookToScroll = !Settings.Vision.LookToScroll;
+            if (!Settings.Vision.LookToScroll) Discard_VisionOS_Look_Scroll();
+            std::snprintf(look_scroll_text,
+                          sizeof(look_scroll_text),
+                          TiberianDawn_LocalizedText("vision_look_scroll_format"),
+                          TiberianDawn_LocalizedText(Settings.Vision.LookToScroll ? "state_on" : "state_off"));
+            lookscrollbtn.Set_Text(look_scroll_text, false);
+            lookscrollbtn.Flag_To_Redraw();
+            break;
+
+        case (BUTTON_VISION_SCROLL_SPEED | KN_BUTTON):
+            Settings.Vision.ScrollSpeed = (Settings.Vision.ScrollSpeed + 1) % 3;
+            std::snprintf(scroll_speed_text,
+                          sizeof(scroll_speed_text),
+                          TiberianDawn_LocalizedText("vision_scroll_speed_format"),
+                          Three_Level_Text(
+                              Settings.Vision.ScrollSpeed, "vision_level_slow", "vision_level_fast"));
+            scrollspeedbtn.Set_Text(scroll_speed_text, false);
+            scrollspeedbtn.Flag_To_Redraw();
+            break;
+
+        case (BUTTON_VISION_EDGE_SENSITIVITY | KN_BUTTON):
+            Settings.Vision.EdgeSensitivity = (Settings.Vision.EdgeSensitivity + 1) % 3;
+            std::snprintf(edge_sensitivity_text,
+                          sizeof(edge_sensitivity_text),
+                          TiberianDawn_LocalizedText("vision_edge_format"),
+                          Three_Level_Text(Settings.Vision.EdgeSensitivity,
+                                                  "vision_level_narrow",
+                                                  "vision_level_wide"));
+            edgebtn.Set_Text(edge_sensitivity_text, false);
+            edgebtn.Flag_To_Redraw();
+            break;
+
+        case (BUTTON_VISION_SELECTION_TOLERANCE | KN_BUTTON):
+            Settings.Vision.SelectionTolerance = (Settings.Vision.SelectionTolerance + 1) % 3;
+            std::snprintf(selection_tolerance_text,
+                          sizeof(selection_tolerance_text),
+                          TiberianDawn_LocalizedText("vision_selection_format"),
+                          Three_Level_Text(Settings.Vision.SelectionTolerance,
+                                                  "vision_level_precise",
+                                                  "vision_level_forgiving"));
+            selectionbtn.Set_Text(selection_tolerance_text, false);
+            selectionbtn.Flag_To_Redraw();
+            break;
+#endif
 #endif
 
         case (BUTTON_RESET | KN_BUTTON):

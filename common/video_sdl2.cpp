@@ -110,6 +110,14 @@ uint64_t hd_buggy_generation = 1;
 bool hd_buggy_renderer_available = false;
 bool hd_humvee_renderer_available = false;
 bool hd_minigunner_renderer_available = false;
+bool hd_gdi_mcv_renderer_available = false;
+bool hd_nod_mcv_renderer_available = false;
+bool hd_gdi_infrastructure_renderer_available = false;
+bool hd_nod_infrastructure_renderer_available = false;
+bool hd_gdi_infrastructure_activity_renderer_available = false;
+bool hd_nod_infrastructure_activity_renderer_available = false;
+IPadPaletteRect hd_artwork_clip = {0, 0, 0, 0};
+bool hd_world_artwork_visible = true;
 Uint8 previous_palette[256 * 3] = {0};
 bool has_previous_palette = false;
 bool force_present = true;
@@ -125,11 +133,25 @@ struct TouchFeedbackState
     int y = 0;
     bool active = false;
     bool pencil = false;
+    TouchFeedbackKind kind = TOUCH_FEEDBACK_NEUTRAL;
     Uint32 expires_at = 0;
     uint64_t generation = 1;
 };
 
 TouchFeedbackState touch_feedback;
+
+struct TouchSelectionBoxState
+{
+    bool active = false;
+    int x1 = 0;
+    int y1 = 0;
+    int x2 = 0;
+    int y2 = 0;
+    uint64_t generation = 1;
+};
+
+TouchSelectionBoxState touch_selection_box;
+bool touch_input_active = false;
 
 struct RegisteredSelectionOverlay
 {
@@ -177,6 +199,30 @@ struct RegisteredHDInfantry
 };
 
 std::vector<RegisteredHDInfantry> hd_infantry;
+
+struct RegisteredHDBuilding
+{
+    const void* object = nullptr;
+    int center_x = 0;
+    int center_y = 0;
+    int width = 0;
+    int height = 0;
+    int frame = -1;
+    int activity_frame = -1;
+    int completion = 255;
+    int damage = 0;
+    int health_x = 0;
+    int health_y = 0;
+    int health_width = 0;
+    int health_fill_width = 0;
+    std::uint8_t palette_index = 0;
+    std::uint8_t health_palette_index = 0;
+    bool health_visible = false;
+    bool repairing = false;
+    int faction_kind = 0;
+};
+
+std::vector<RegisteredHDBuilding> hd_buildings;
 
 void Discover_Modern_Art_Pack()
 {
@@ -236,6 +282,50 @@ std::string Modern_Minigunner_Atlas_Path()
 {
     const HDAssetEntry* minigunner = modern_art_pack.Is_Loaded() ? modern_art_pack.Find("infantry.minigunner") : nullptr;
     return minigunner ? modern_art_pack.Absolute_Path(*minigunner) : std::string();
+}
+
+std::string Modern_GDI_MCV_Atlas_Path()
+{
+    const HDAssetEntry* mcv = modern_art_pack.Is_Loaded() ? modern_art_pack.Find("unit.mcv.gdi") : nullptr;
+    return mcv ? modern_art_pack.Absolute_Path(*mcv) : std::string();
+}
+
+std::string Modern_Nod_MCV_Atlas_Path()
+{
+    const HDAssetEntry* mcv = modern_art_pack.Is_Loaded() ? modern_art_pack.Find("unit.mcv.nod") : nullptr;
+    return mcv ? modern_art_pack.Absolute_Path(*mcv) : std::string();
+}
+
+std::string Modern_GDI_Infrastructure_Atlas_Path()
+{
+    const HDAssetEntry* infrastructure = modern_art_pack.Is_Loaded()
+                                                   ? modern_art_pack.Find("building.infrastructure.gdi")
+                                                   : nullptr;
+    return infrastructure ? modern_art_pack.Absolute_Path(*infrastructure) : std::string();
+}
+
+std::string Modern_Nod_Infrastructure_Atlas_Path()
+{
+    const HDAssetEntry* infrastructure = modern_art_pack.Is_Loaded()
+                                                   ? modern_art_pack.Find("building.infrastructure.nod")
+                                                   : nullptr;
+    return infrastructure ? modern_art_pack.Absolute_Path(*infrastructure) : std::string();
+}
+
+std::string Modern_GDI_Infrastructure_Activity_Atlas_Path()
+{
+    const HDAssetEntry* infrastructure = modern_art_pack.Is_Loaded()
+                                                   ? modern_art_pack.Find("building.infrastructure.activity.gdi")
+                                                   : nullptr;
+    return infrastructure ? modern_art_pack.Absolute_Path(*infrastructure) : std::string();
+}
+
+std::string Modern_Nod_Infrastructure_Activity_Atlas_Path()
+{
+    const HDAssetEntry* infrastructure = modern_art_pack.Is_Loaded()
+                                                   ? modern_art_pack.Find("building.infrastructure.activity.nod")
+                                                   : nullptr;
+    return infrastructure ? modern_art_pack.Absolute_Path(*infrastructure) : std::string();
 }
 
 int Modern_Asset_Scale()
@@ -889,6 +979,15 @@ void Move_Video_Mouse(float xrel, float yrel)
 
 void Get_Video_Mouse(int& x, int& y)
 {
+#ifdef IPADOS_PORT
+    /* Touch and native visionOS gestures update the logical cursor directly.
+     * SDL_GetMouseState remains at the last trackpad/pointer position when
+     * touch-to-mouse synthesis is disabled. Reading it while a button is held
+     * displaced the rubber-band rectangle from the finger and could leave the
+     * classic tactical cursor stranded after a keyboard-dock transition. */
+    x = hwcursor.X;
+    y = hwcursor.Y;
+#else
     if (Keyboard->Is_Gamepad_Active() || (Settings.Mouse.RawInput && (hwcursor.Clip || !Settings.Video.Windowed))) {
         x = hwcursor.X;
         y = hwcursor.Y;
@@ -903,6 +1002,7 @@ void Get_Video_Mouse(int& x, int& y)
         y = window_y / hwcursor.ScaleY;
 #endif
     }
+#endif
 }
 
 #ifdef TIBERIAN_DAWN_APPLE_PORT
@@ -934,6 +1034,14 @@ void Set_Video_Mouse_Normalized(float normalized_x, float normalized_y, int& gam
     hwcursor.X = game_x;
     hwcursor.Y = game_y;
 }
+
+int Video_Game_Pixels_For_Window_Points(float points)
+{
+    if (renderer_output_w <= 0 || renderer_output_h <= 0 || window_points_w <= 0 || window_points_h <= 0) {
+        Refresh_Video_Layout();
+    }
+    return IPad_Game_Pixels_For_Window_Points(ipad_layout, points);
+}
 #endif
 
 /***********************************************************************************************
@@ -955,6 +1063,9 @@ void Reset_Video_Mode(void)
     ++selection_generation;
     hd_buggies.clear();
     hd_infantry.clear();
+    hd_buildings.clear();
+    hd_artwork_clip = {0, 0, 0, 0};
+    hd_world_artwork_visible = true;
     ++hd_buggy_generation;
 #endif
     if (hwcursor.Pending) {
@@ -1240,6 +1351,7 @@ public:
         , lastSelectionGeneration(0)
         , lastHDBuggyGeneration(0)
         , lastTouchFeedbackGeneration(0)
+        , lastTouchSelectionGeneration(0)
         , lastCursorX(-1)
         , lastCursorY(-1)
         , hadSoftwareCursor(false)
@@ -1258,6 +1370,14 @@ public:
             const std::string buggy_atlas_path = Modern_Buggy_Atlas_Path();
             const std::string humvee_atlas_path = Modern_Humvee_Atlas_Path();
             const std::string minigunner_atlas_path = Modern_Minigunner_Atlas_Path();
+            const std::string gdi_mcv_atlas_path = Modern_GDI_MCV_Atlas_Path();
+            const std::string nod_mcv_atlas_path = Modern_Nod_MCV_Atlas_Path();
+            const std::string gdi_infrastructure_atlas_path = Modern_GDI_Infrastructure_Atlas_Path();
+            const std::string nod_infrastructure_atlas_path = Modern_Nod_Infrastructure_Atlas_Path();
+            const std::string gdi_infrastructure_activity_atlas_path =
+                Modern_GDI_Infrastructure_Activity_Atlas_Path();
+            const std::string nod_infrastructure_activity_atlas_path =
+                Modern_Nod_Infrastructure_Activity_Atlas_Path();
             paletteRenderer = IPad_Palette_Create(renderer,
                                                   w,
                                                   h,
@@ -1265,10 +1385,24 @@ public:
                                                   buggy_atlas_path.c_str(),
                                                   humvee_atlas_path.c_str(),
                                                   minigunner_atlas_path.c_str(),
+                                                  gdi_mcv_atlas_path.c_str(),
+                                                  nod_mcv_atlas_path.c_str(),
+                                                  gdi_infrastructure_atlas_path.c_str(),
+                                                  nod_infrastructure_atlas_path.c_str(),
+                                                  gdi_infrastructure_activity_atlas_path.c_str(),
+                                                  nod_infrastructure_activity_atlas_path.c_str(),
                                                   Modern_Asset_Scale());
             hd_buggy_renderer_available = IPad_Palette_Has_Buggy_Artwork(paletteRenderer);
             hd_humvee_renderer_available = IPad_Palette_Has_Humvee_Artwork(paletteRenderer);
             hd_minigunner_renderer_available = IPad_Palette_Has_Minigunner_Artwork(paletteRenderer);
+            hd_gdi_mcv_renderer_available = IPad_Palette_Has_GDI_MCV_Artwork(paletteRenderer);
+            hd_nod_mcv_renderer_available = IPad_Palette_Has_Nod_MCV_Artwork(paletteRenderer);
+            hd_gdi_infrastructure_renderer_available = IPad_Palette_Has_GDI_Infrastructure_Artwork(paletteRenderer);
+            hd_nod_infrastructure_renderer_available = IPad_Palette_Has_Nod_Infrastructure_Artwork(paletteRenderer);
+            hd_gdi_infrastructure_activity_renderer_available =
+                IPad_Palette_Has_GDI_Infrastructure_Activity_Artwork(paletteRenderer);
+            hd_nod_infrastructure_activity_renderer_available =
+                IPad_Palette_Has_Nod_Infrastructure_Activity_Artwork(paletteRenderer);
 #endif
             frontSurface = this;
         }
@@ -1282,6 +1416,12 @@ public:
             hd_buggy_renderer_available = false;
             hd_humvee_renderer_available = false;
             hd_minigunner_renderer_available = false;
+            hd_gdi_mcv_renderer_available = false;
+            hd_nod_mcv_renderer_available = false;
+            hd_gdi_infrastructure_renderer_available = false;
+            hd_nod_infrastructure_renderer_available = false;
+            hd_gdi_infrastructure_activity_renderer_available = false;
+            hd_nod_infrastructure_activity_renderer_available = false;
 #endif
         }
 
@@ -1371,7 +1511,8 @@ public:
 
         int cursor_x = -1;
         int cursor_y = -1;
-        const bool software_cursor = !Settings.Video.HardwareCursor && !Get_Mouse_State() && hwcursor.Surface != nullptr;
+        const bool software_cursor = !touch_input_active && !Settings.Video.HardwareCursor
+                                     && !Get_Mouse_State() && hwcursor.Surface != nullptr;
         if (software_cursor) {
             Get_Video_Mouse(cursor_x, cursor_y);
         }
@@ -1409,6 +1550,7 @@ public:
                                     || lastSelectionGeneration != selection_generation
                                     || lastHDBuggyGeneration != hd_buggy_generation
                                     || lastTouchFeedbackGeneration != touch_feedback.generation
+                                    || lastTouchSelectionGeneration != touch_selection_box.generation
                                     || hadSoftwareCursor != software_cursor || lastCursorX != cursor_x
                                     || lastCursorY != cursor_y;
         if (!visible_change) {
@@ -1433,8 +1575,62 @@ public:
 #ifdef TIBERIAN_DAWN_APPLE_PORT
         IPadPaletteCursor metal_cursor = {};
         std::vector<IPadSelectionOverlay> metal_selections;
+        std::vector<IPadHDBuildingOverlay> metal_buildings;
         std::vector<IPadHDBuggyOverlay> metal_buggies;
         std::vector<IPadHDInfantryOverlay> metal_infantry;
+        if (Settings.Video.ArtworkMode != 0 && !hd_buildings.empty()) {
+            const float scale_x = render_dst.w / static_cast<float>(surface->w);
+            const float scale_y = render_dst.h / static_cast<float>(surface->h);
+            std::vector<RegisteredHDBuilding> sorted_buildings = hd_buildings;
+            std::stable_sort(sorted_buildings.begin(),
+                             sorted_buildings.end(),
+                             [](const RegisteredHDBuilding& first, const RegisteredHDBuilding& second) {
+                                 return first.center_y < second.center_y;
+                             });
+            metal_buildings.reserve(sorted_buildings.size());
+            for (const RegisteredHDBuilding& registered : sorted_buildings) {
+                const int half_width = registered.width / 2;
+                const int half_height = registered.height / 2;
+                const int left = render_dst.x
+                                 + static_cast<int>(std::lround((registered.center_x - half_width) * scale_x));
+                const int top = render_dst.y
+                                + static_cast<int>(std::lround((registered.center_y - half_height) * scale_y));
+                const int right = render_dst.x
+                                  + static_cast<int>(std::lround((registered.center_x
+                                                                  + registered.width - half_width) * scale_x));
+                const int bottom = render_dst.y
+                                   + static_cast<int>(std::lround((registered.center_y
+                                                                   + registered.height - half_height) * scale_y));
+                const int health_left = render_dst.x
+                                        + static_cast<int>(std::lround(registered.health_x * scale_x));
+                const int health_top = render_dst.y
+                                       + static_cast<int>(std::lround(registered.health_y * scale_y));
+                const int health_right = render_dst.x
+                                         + static_cast<int>(std::lround((registered.health_x
+                                                                         + registered.health_width) * scale_x));
+                const int health_bottom = render_dst.y
+                                          + static_cast<int>(std::lround((registered.health_y + 4) * scale_y));
+                IPadHDBuildingOverlay overlay;
+                overlay.destination = {left, top, std::max(1, right - left), std::max(1, bottom - top)};
+                overlay.health_destination = {health_left,
+                                              health_top,
+                                              std::max(1, health_right - health_left),
+                                              std::max(1, health_bottom - health_top)};
+                overlay.frame = registered.frame;
+                overlay.activity_frame = registered.activity_frame;
+                overlay.health_fill_width = std::max(
+                    0,
+                    static_cast<int>(std::lround(registered.health_fill_width * scale_x)));
+                overlay.completion = registered.completion;
+                overlay.damage = registered.damage;
+                overlay.palette_index = registered.palette_index;
+                overlay.health_palette_index = registered.health_palette_index;
+                overlay.health_visible = registered.health_visible;
+                overlay.repairing = registered.repairing;
+                overlay.faction_kind = registered.faction_kind;
+                metal_buildings.push_back(overlay);
+            }
+        }
         if (Settings.Video.ArtworkMode != 0 && !hd_buggies.empty()) {
             const float scale_x = render_dst.w / static_cast<float>(surface->w);
             const float scale_y = render_dst.h / static_cast<float>(surface->h);
@@ -1446,10 +1642,15 @@ public:
             metal_buggies.reserve(sorted_buggies.size());
             for (const RegisteredHDBuggy& registered : sorted_buggies) {
                 const auto destination = [&](int center_x, int center_y) {
-                    const int left = render_dst.x + static_cast<int>(std::lround((center_x - 12) * scale_x));
-                    const int top = render_dst.y + static_cast<int>(std::lround((center_y - 12) * scale_y));
-                    const int right = render_dst.x + static_cast<int>(std::lround((center_x + 12) * scale_x));
-                    const int bottom = render_dst.y + static_cast<int>(std::lround((center_y + 12) * scale_y));
+                    const int half_size = registered.atlas_kind >= 2 ? 16 : 12;
+                    const int left = render_dst.x
+                                     + static_cast<int>(std::lround((center_x - half_size) * scale_x));
+                    const int top = render_dst.y
+                                    + static_cast<int>(std::lround((center_y - half_size) * scale_y));
+                    const int right = render_dst.x
+                                      + static_cast<int>(std::lround((center_x + half_size) * scale_x));
+                    const int bottom = render_dst.y
+                                       + static_cast<int>(std::lround((center_y + half_size) * scale_y));
                     return IPadPaletteRect{left, top, std::max(1, right - left), std::max(1, bottom - top)};
                 };
                 IPadHDBuggyOverlay overlay;
@@ -1524,7 +1725,7 @@ public:
                 metal_infantry.push_back(overlay);
             }
         }
-        if (Settings.Video.ArtworkMode != 0 && !selection_overlays.empty()) {
+        if (hd_world_artwork_visible && Settings.Video.ArtworkMode != 0 && !selection_overlays.empty()) {
             const float scale_x = render_dst.w / static_cast<float>(surface->w);
             const float scale_y = render_dst.h / static_cast<float>(surface->h);
             metal_selections.reserve(selection_overlays.size());
@@ -1568,6 +1769,29 @@ public:
         SDL_RenderClear(renderer);
         if (paletteRenderer) {
             const IPadPaletteRect viewport = {render_dst.x, render_dst.y, render_dst.w, render_dst.h};
+            IPadPaletteRect world_clip = viewport;
+            if (hd_artwork_clip.width > 0 && hd_artwork_clip.height > 0) {
+                const float scale_x = render_dst.w / static_cast<float>(surface->w);
+                const float scale_y = render_dst.h / static_cast<float>(surface->h);
+                const int clip_left = std::max(
+                    viewport.x,
+                    render_dst.x + static_cast<int>(std::lround(hd_artwork_clip.x * scale_x)));
+                const int clip_top = std::max(
+                    viewport.y,
+                    render_dst.y + static_cast<int>(std::lround(hd_artwork_clip.y * scale_y)));
+                const int clip_right = std::min(
+                    viewport.x + viewport.width,
+                    render_dst.x
+                        + static_cast<int>(std::lround((hd_artwork_clip.x + hd_artwork_clip.width) * scale_x)));
+                const int clip_bottom = std::min(
+                    viewport.y + viewport.height,
+                    render_dst.y
+                        + static_cast<int>(std::lround((hd_artwork_clip.y + hd_artwork_clip.height) * scale_y)));
+                world_clip = {clip_left,
+                              clip_top,
+                              std::max(0, clip_right - clip_left),
+                              std::max(0, clip_bottom - clip_top)};
+            }
             metal_rendered = IPad_Palette_Render(paletteRenderer,
                                                 renderer,
                                                 surface->pixels,
@@ -1579,6 +1803,9 @@ public:
                                                 Settings.Video.PresentationMode,
                                                 Settings.Video.ArtworkMode,
                                                 viewport,
+                                                world_clip,
+                                                metal_buildings.empty() ? nullptr : metal_buildings.data(),
+                                                static_cast<int>(metal_buildings.size()),
                                                 metal_buggies.empty() ? nullptr : metal_buggies.data(),
                                                 static_cast<int>(metal_buggies.size()),
                                                 metal_infantry.empty() ? nullptr : metal_infantry.data(),
@@ -1610,7 +1837,11 @@ public:
                 /*
                 ** Update hardware cursor visibility.
                 */
+#ifdef TIBERIAN_DAWN_APPLE_PORT
+                SDL_ShowCursor(!touch_input_active && !Get_Mouse_State());
+#else
                 SDL_ShowCursor(!Get_Mouse_State());
+#endif
             } else if (!Get_Mouse_State() && hwcursor.Surface != nullptr) {
                 /*
                 ** Draw software emulated cursor.
@@ -1643,6 +1874,35 @@ public:
             SDL_RenderCopy(renderer, texture, NULL, &render_dst);
         }
 #ifdef TIBERIAN_DAWN_APPLE_PORT
+        if (touch_selection_box.active) {
+            const float scale_x = render_dst.w / static_cast<float>(hwcursor.GameW);
+            const float scale_y = render_dst.h / static_cast<float>(hwcursor.GameH);
+            const int left_game = std::min(touch_selection_box.x1, touch_selection_box.x2);
+            const int top_game = std::min(touch_selection_box.y1, touch_selection_box.y2);
+            const int right_game = std::max(touch_selection_box.x1, touch_selection_box.x2);
+            const int bottom_game = std::max(touch_selection_box.y1, touch_selection_box.y2);
+            SDL_Rect box = {
+                render_dst.x + static_cast<int>(std::lround(left_game * scale_x)),
+                render_dst.y + static_cast<int>(std::lround(top_game * scale_y)),
+                std::max(1, static_cast<int>(std::lround((right_game - left_game) * scale_x))),
+                std::max(1, static_cast<int>(std::lround((bottom_game - top_game) * scale_y))),
+            };
+            SDL_RenderSetClipRect(renderer, &render_dst);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            if (Settings.Video.HighContrast) {
+                SDL_Rect shadow = {box.x - 2, box.y - 2, box.w + 4, box.h + 4};
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 230);
+                SDL_RenderDrawRect(renderer, &shadow);
+            }
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 245);
+            SDL_RenderDrawRect(renderer, &box);
+            if (box.w > 4 && box.h > 4) {
+                SDL_Rect inner = {box.x + 2, box.y + 2, box.w - 4, box.h - 4};
+                SDL_SetRenderDrawColor(renderer, 255, 220, 80, 230);
+                SDL_RenderDrawRect(renderer, &inner);
+            }
+            SDL_RenderSetClipRect(renderer, nullptr);
+        }
         if (touch_feedback.active) {
             const float scale_x = render_dst.w / static_cast<float>(hwcursor.GameW);
             const float scale_y = render_dst.h / static_cast<float>(hwcursor.GameH);
@@ -1655,12 +1915,32 @@ public:
                 ring[i].x = center_x + static_cast<int>(std::cos(angle) * radius);
                 ring[i].y = center_y + static_cast<int>(std::sin(angle) * radius);
             }
-            if (touch_feedback.pencil) {
+            if (touch_feedback.kind == TOUCH_FEEDBACK_ATTACK) {
+                SDL_SetRenderDrawColor(renderer, 255, 70, 60, 235);
+            } else if (touch_feedback.kind == TOUCH_FEEDBACK_MOVE) {
+                SDL_SetRenderDrawColor(renderer, 70, 235, 110, 230);
+            } else if (touch_feedback.pencil) {
                 SDL_SetRenderDrawColor(renderer, 80, 210, 255, 220);
             } else {
                 SDL_SetRenderDrawColor(renderer, 255, 220, 80, 205);
             }
             SDL_RenderDrawLines(renderer, ring, 33);
+            if (touch_feedback.kind == TOUCH_FEEDBACK_ATTACK) {
+                const int inner = std::max(3, radius / 2);
+                const int outer = radius + 6;
+                SDL_RenderDrawLine(renderer, center_x - outer, center_y, center_x - inner, center_y);
+                SDL_RenderDrawLine(renderer, center_x + inner, center_y, center_x + outer, center_y);
+                SDL_RenderDrawLine(renderer, center_x, center_y - outer, center_x, center_y - inner);
+                SDL_RenderDrawLine(renderer, center_x, center_y + inner, center_x, center_y + outer);
+            } else if (touch_feedback.kind == TOUCH_FEEDBACK_MOVE) {
+                const int tick_inner = radius + 2;
+                const int tick_outer = radius + 6;
+                SDL_RenderDrawLine(renderer, center_x - tick_outer, center_y, center_x - tick_inner, center_y);
+                SDL_RenderDrawLine(renderer, center_x + tick_inner, center_y, center_x + tick_outer, center_y);
+                SDL_RenderDrawLine(renderer, center_x, center_y - tick_outer, center_x, center_y - tick_inner);
+                SDL_RenderDrawLine(renderer, center_x, center_y + tick_inner, center_x, center_y + tick_outer);
+                SDL_RenderDrawPoint(renderer, center_x, center_y);
+            }
             if (Settings.Video.HighContrast) {
                 for (int i = 0; i <= 32; ++i) {
                     const float angle = static_cast<float>(i) * 6.28318530718f / 32.0f;
@@ -1693,6 +1973,7 @@ public:
         lastSelectionGeneration = selection_generation;
         lastHDBuggyGeneration = hd_buggy_generation;
         lastTouchFeedbackGeneration = touch_feedback.generation;
+        lastTouchSelectionGeneration = touch_selection_box.generation;
         lastCursorX = cursor_x;
         lastCursorY = cursor_y;
         hadSoftwareCursor = software_cursor;
@@ -1716,6 +1997,7 @@ private:
     uint64_t lastSelectionGeneration;
     uint64_t lastHDBuggyGeneration;
     uint64_t lastTouchFeedbackGeneration;
+    uint64_t lastTouchSelectionGeneration;
     int lastCursorX;
     int lastCursorY;
     bool hadSoftwareCursor;
@@ -1752,12 +2034,62 @@ void Video_Record_Input_Timestamp(uint32_t timestamp_ms)
 
 void Video_Set_Touch_Feedback(int game_x, int game_y, bool pencil, bool released)
 {
+    Video_Set_Touch_Input(true);
     touch_feedback.x = std::max(0, std::min(game_x, hwcursor.GameW - 1));
     touch_feedback.y = std::max(0, std::min(game_y, hwcursor.GameH - 1));
     touch_feedback.pencil = pencil;
+    touch_feedback.kind = TOUCH_FEEDBACK_NEUTRAL;
     touch_feedback.active = true;
     touch_feedback.expires_at = SDL_GetTicks() + (released ? 180 : 1000);
     ++touch_feedback.generation;
+    force_present = true;
+    last_frame_idle = false;
+}
+
+void Video_Set_Touch_Feedback_Kind(TouchFeedbackKind kind)
+{
+    if (!touch_feedback.active || touch_feedback.kind == kind) return;
+    touch_feedback.kind = kind;
+    // A semantic command marker should remain readable for a little longer
+    // than the neutral touch-up flash, on both iPadOS and native visionOS.
+    touch_feedback.expires_at = std::max(touch_feedback.expires_at, SDL_GetTicks() + 320);
+    ++touch_feedback.generation;
+    force_present = true;
+    last_frame_idle = false;
+}
+
+void Video_Clear_Touch_Feedback(void)
+{
+    if (!touch_feedback.active) return;
+    touch_feedback.active = false;
+    ++touch_feedback.generation;
+    force_present = true;
+    last_frame_idle = false;
+}
+
+void Video_Set_Touch_Input(bool touch_input)
+{
+    if (touch_input_active == touch_input) return;
+    touch_input_active = touch_input;
+    force_present = true;
+    last_frame_idle = false;
+}
+
+void Video_Set_Touch_Selection_Box(bool active, int x1, int y1, int x2, int y2)
+{
+    x1 = std::max(0, std::min(x1, hwcursor.GameW - 1));
+    y1 = std::max(0, std::min(y1, hwcursor.GameH - 1));
+    x2 = std::max(0, std::min(x2, hwcursor.GameW - 1));
+    y2 = std::max(0, std::min(y2, hwcursor.GameH - 1));
+    if (touch_selection_box.active == active && touch_selection_box.x1 == x1
+        && touch_selection_box.y1 == y1 && touch_selection_box.x2 == x2
+        && touch_selection_box.y2 == y2) return;
+    touch_selection_box.active = active;
+    touch_selection_box.x1 = x1;
+    touch_selection_box.y1 = y1;
+    touch_selection_box.x2 = x2;
+    touch_selection_box.y2 = y2;
+    ++touch_selection_box.generation;
     force_present = true;
     last_frame_idle = false;
 }
@@ -1769,7 +2101,7 @@ void Video_Set_Selection_Overlay(const void* object,
                                  int height,
                                  unsigned char palette_index)
 {
-    if (!object || width <= 0 || height <= 0) return;
+    if (!hd_world_artwork_visible || !object || width <= 0 || height <= 0) return;
     const IPadPaletteRect logical = {x, y, width, height};
     for (RegisteredSelectionOverlay& overlay : selection_overlays) {
         if (overlay.object != object) continue;
@@ -1805,6 +2137,65 @@ void Video_Remove_Selection_Overlay(const void* object)
     force_present = true;
 }
 
+void Video_Set_HD_Artwork_Clip(int x, int y, int width, int height)
+{
+    const IPadPaletteRect clip = {x, y, std::max(0, width), std::max(0, height)};
+    if (hd_artwork_clip.x == clip.x && hd_artwork_clip.y == clip.y
+        && hd_artwork_clip.width == clip.width && hd_artwork_clip.height == clip.height) return;
+    hd_artwork_clip = clip;
+    ++hd_buggy_generation;
+    force_present = true;
+}
+
+void Video_Set_HD_World_Artwork_Visible(bool visible)
+{
+    if (hd_world_artwork_visible == visible) return;
+    hd_world_artwork_visible = visible;
+    if (!visible) {
+        Video_Clear_HD_Artwork();
+        if (touch_selection_box.active) {
+            touch_selection_box.active = false;
+            ++touch_selection_box.generation;
+        }
+    }
+    ++hd_buggy_generation;
+    force_present = true;
+}
+
+void Video_Offset_HD_World_Artwork(int x, int y)
+{
+    if ((x == 0 && y == 0)
+        || (hd_buggies.empty() && hd_infantry.empty() && hd_buildings.empty()
+            && selection_overlays.empty())) return;
+    for (RegisteredHDBuggy& buggy : hd_buggies) {
+        buggy.body_x += x;
+        buggy.body_y += y;
+        buggy.turret_x += x;
+        buggy.turret_y += y;
+        buggy.health_x += x;
+        buggy.health_y += y;
+    }
+    for (RegisteredHDInfantry& soldier : hd_infantry) {
+        soldier.center_x += x;
+        soldier.center_y += y;
+        soldier.health_x += x;
+        soldier.health_y += y;
+    }
+    for (RegisteredHDBuilding& building : hd_buildings) {
+        building.center_x += x;
+        building.center_y += y;
+        building.health_x += x;
+        building.health_y += y;
+    }
+    for (RegisteredSelectionOverlay& selection : selection_overlays) {
+        selection.logical.x += x;
+        selection.logical.y += y;
+    }
+    ++hd_buggy_generation;
+    ++selection_generation;
+    force_present = true;
+}
+
 void Video_Set_HD_Buggy_Component(const void* object,
                                   int component,
                                   int frame,
@@ -1823,10 +2214,15 @@ void Video_Set_HD_Vehicle_Component(const void* object,
                                     int center_y,
                                     unsigned char palette_index)
 {
-    if (!object || vehicle_kind < 0 || vehicle_kind > 1 || component < 0 || component > 1
-        || frame < 0 || frame >= 64) return;
+    const int frame_count = vehicle_kind >= 2 ? 8 : 64;
+    if (!object || !hd_world_artwork_visible || vehicle_kind < 0 || vehicle_kind > 3 || component < 0 || component > 1
+        || (vehicle_kind >= 2 && component != 0) || frame < 0 || frame >= frame_count) return;
     for (RegisteredHDBuggy& buggy : hd_buggies) {
         if (buggy.object != object) continue;
+        if (buggy.atlas_kind != vehicle_kind) {
+            buggy.body_frame = -1;
+            buggy.turret_frame = -1;
+        }
         int& saved_frame = component == 0 ? buggy.body_frame : buggy.turret_frame;
         int& saved_x = component == 0 ? buggy.body_x : buggy.turret_x;
         int& saved_y = component == 0 ? buggy.body_y : buggy.turret_y;
@@ -1866,7 +2262,7 @@ void Video_Set_HD_Infantry(const void* object,
                            int center_y,
                            unsigned char palette_index)
 {
-    if (!object || frame < 0 || frame >= 80) return;
+    if (!object || !hd_world_artwork_visible || frame < 0 || frame >= 80) return;
     for (RegisteredHDInfantry& soldier : hd_infantry) {
         if (soldier.object != object) continue;
         if (soldier.frame == frame && soldier.center_x == center_x && soldier.center_y == center_y
@@ -1890,6 +2286,65 @@ void Video_Set_HD_Infantry(const void* object,
     force_present = true;
 }
 
+void Video_Set_HD_Building(const void* object,
+                           int faction_kind,
+                           int frame,
+                           int activity_frame,
+                           int center_x,
+                           int center_y,
+                           int width,
+                           int height,
+                           int completion,
+                           int damage,
+                           bool repairing,
+                           unsigned char palette_index)
+{
+    if (!object || faction_kind < 0 || faction_kind > 1 || frame < 0 || frame >= 3
+        || activity_frame < -1 || activity_frame >= 30
+        || width <= 0 || height <= 0 || !hd_world_artwork_visible) return;
+    completion = std::max(0, std::min(completion, 255));
+    damage = std::max(0, std::min(damage, 255));
+    for (RegisteredHDBuilding& building : hd_buildings) {
+        if (building.object != object) continue;
+        if (building.faction_kind == faction_kind && building.frame == frame
+            && building.activity_frame == activity_frame
+            && building.center_x == center_x && building.center_y == center_y
+            && building.width == width && building.height == height
+            && building.completion == completion && building.damage == damage
+            && building.repairing == repairing && building.palette_index == palette_index) return;
+        building.faction_kind = faction_kind;
+        building.frame = frame;
+        building.activity_frame = activity_frame;
+        building.center_x = center_x;
+        building.center_y = center_y;
+        building.width = width;
+        building.height = height;
+        building.completion = completion;
+        building.damage = damage;
+        building.repairing = repairing;
+        building.palette_index = palette_index;
+        ++hd_buggy_generation;
+        force_present = true;
+        return;
+    }
+    RegisteredHDBuilding building;
+    building.object = object;
+    building.faction_kind = faction_kind;
+    building.frame = frame;
+    building.activity_frame = activity_frame;
+    building.center_x = center_x;
+    building.center_y = center_y;
+    building.width = width;
+    building.height = height;
+    building.completion = completion;
+    building.damage = damage;
+    building.repairing = repairing;
+    building.palette_index = palette_index;
+    hd_buildings.push_back(building);
+    ++hd_buggy_generation;
+    force_present = true;
+}
+
 void Video_Remove_HD_Artwork(const void* object)
 {
     const auto previous_size = hd_buggies.size();
@@ -1906,8 +2361,29 @@ void Video_Remove_HD_Artwork(const void* object)
                                          return soldier.object == object;
                                      }),
                       hd_infantry.end());
-    if (hd_buggies.size() == previous_size && hd_infantry.size() == previous_infantry_size) return;
+    const auto previous_building_size = hd_buildings.size();
+    hd_buildings.erase(std::remove_if(hd_buildings.begin(),
+                                     hd_buildings.end(),
+                                     [object](const RegisteredHDBuilding& building) {
+                                         return building.object == object;
+                                     }),
+                       hd_buildings.end());
+    if (hd_buggies.size() == previous_size && hd_infantry.size() == previous_infantry_size
+        && hd_buildings.size() == previous_building_size) return;
     ++hd_buggy_generation;
+    force_present = true;
+}
+
+void Video_Clear_HD_Artwork()
+{
+    if (hd_buggies.empty() && hd_infantry.empty() && hd_buildings.empty()
+        && selection_overlays.empty()) return;
+    hd_buggies.clear();
+    hd_infantry.clear();
+    hd_buildings.clear();
+    selection_overlays.clear();
+    ++hd_buggy_generation;
+    ++selection_generation;
     force_present = true;
 }
 
@@ -1954,26 +2430,62 @@ void Video_Set_HD_Health(const void* object,
         force_present = true;
         return;
     }
+    for (RegisteredHDBuilding& building : hd_buildings) {
+        if (building.object != object) continue;
+        if (building.health_visible == visible && (!visible
+                                                   || (building.health_x == x && building.health_y == y
+                                                       && building.health_width == width
+                                                       && building.health_fill_width == fill_width
+                                                       && building.health_palette_index == palette_index))) return;
+        building.health_visible = visible;
+        building.health_x = x;
+        building.health_y = y;
+        building.health_width = width;
+        building.health_fill_width = fill_width;
+        building.health_palette_index = palette_index;
+        ++hd_buggy_generation;
+        force_present = true;
+        return;
+    }
 }
 
 bool Video_Uses_HD_Buggy_Artwork()
 {
-    return Settings.Video.ArtworkMode != 0 && hd_buggy_renderer_available;
+    return hd_world_artwork_visible && Settings.Video.ArtworkMode != 0 && hd_buggy_renderer_available;
 }
 
 bool Video_Uses_HD_Humvee_Artwork()
 {
-    return Settings.Video.ArtworkMode != 0 && hd_humvee_renderer_available;
+    return hd_world_artwork_visible && Settings.Video.ArtworkMode != 0 && hd_humvee_renderer_available;
 }
 
 bool Video_Uses_HD_Minigunner_Artwork()
 {
-    return Settings.Video.ArtworkMode != 0 && hd_minigunner_renderer_available;
+    return hd_world_artwork_visible && Settings.Video.ArtworkMode != 0 && hd_minigunner_renderer_available;
+}
+
+bool Video_Uses_HD_MCV_Artwork(bool nod)
+{
+    return hd_world_artwork_visible && Settings.Video.ArtworkMode != 0
+           && (nod ? hd_nod_mcv_renderer_available : hd_gdi_mcv_renderer_available);
+}
+
+bool Video_Uses_HD_Infrastructure_Artwork(bool nod)
+{
+    return hd_world_artwork_visible && Settings.Video.ArtworkMode != 0
+           && (nod ? hd_nod_infrastructure_renderer_available : hd_gdi_infrastructure_renderer_available);
+}
+
+bool Video_Uses_HD_Infrastructure_Activity_Artwork(bool nod)
+{
+    return hd_world_artwork_visible && Settings.Video.ArtworkMode != 0
+           && (nod ? hd_nod_infrastructure_activity_renderer_available
+                   : hd_gdi_infrastructure_activity_renderer_available);
 }
 
 bool Video_Uses_Modern_Artwork()
 {
-    return Settings.Video.ArtworkMode != 0;
+    return hd_world_artwork_visible && Settings.Video.ArtworkMode != 0;
 }
 
 void Set_IPadOS_Text_Input_Rect(int game_x, int game_y, int game_w, int game_h)

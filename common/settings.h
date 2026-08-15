@@ -49,6 +49,21 @@ public:
     {
         bool MouseWheelScrolling;
     } Options;
+
+    struct
+    {
+        bool EdgeScroll;
+        int ScrollSpeed;
+        int SelectionTolerance;
+    } Touch;
+
+    struct
+    {
+        bool LookToScroll;
+        int ScrollSpeed;
+        int EdgeSensitivity;
+        int SelectionTolerance;
+    } Vision;
 };
 
 extern SettingsClass Settings;

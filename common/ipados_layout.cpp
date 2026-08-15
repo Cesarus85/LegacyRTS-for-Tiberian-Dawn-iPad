@@ -101,3 +101,21 @@ void Map_IPad_Normalized_Point(const IPadLayout& layout,
                           game_x,
                           game_y);
 }
+
+int IPad_Game_Pixels_For_Window_Points(const IPadLayout& layout, float points)
+{
+    if (points <= 0.0f) return 0;
+
+    const float output_per_window_x =
+        layout.output_width / static_cast<float>(std::max(1, layout.window_width));
+    const float output_per_window_y =
+        layout.output_height / static_cast<float>(std::max(1, layout.window_height));
+    const float viewport_points_w = layout.viewport.width / std::max(0.0001f, output_per_window_x);
+    const float viewport_points_h = layout.viewport.height / std::max(0.0001f, output_per_window_y);
+    const float game_pixels_per_point_x = layout.game_width / std::max(1.0f, viewport_points_w);
+    const float game_pixels_per_point_y = layout.game_height / std::max(1.0f, viewport_points_h);
+    return std::max(1,
+                    static_cast<int>(std::ceil(points
+                                               * std::max(game_pixels_per_point_x,
+                                                          game_pixels_per_point_y))));
+}

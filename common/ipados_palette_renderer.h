@@ -58,6 +58,22 @@ struct IPadHDInfantryOverlay
     bool health_visible;
 };
 
+struct IPadHDBuildingOverlay
+{
+    IPadPaletteRect destination;
+    IPadPaletteRect health_destination;
+    int frame;
+    int activity_frame;
+    int health_fill_width;
+    int completion;
+    int damage;
+    std::uint8_t palette_index;
+    std::uint8_t health_palette_index;
+    bool health_visible;
+    bool repairing;
+    int faction_kind;
+};
+
 typedef void* IPadPaletteRenderer;
 
 IPadPaletteRenderer IPad_Palette_Create(SDL_Renderer* renderer,
@@ -67,11 +83,23 @@ IPadPaletteRenderer IPad_Palette_Create(SDL_Renderer* renderer,
                                         const char* buggy_atlas_path,
                                         const char* humvee_atlas_path,
                                         const char* minigunner_atlas_path,
+                                        const char* gdi_mcv_atlas_path,
+                                        const char* nod_mcv_atlas_path,
+                                        const char* gdi_infrastructure_atlas_path,
+                                        const char* nod_infrastructure_atlas_path,
+                                        const char* gdi_infrastructure_activity_atlas_path,
+                                        const char* nod_infrastructure_activity_atlas_path,
                                         int modern_asset_scale);
 void IPad_Palette_Destroy(IPadPaletteRenderer renderer);
 bool IPad_Palette_Has_Buggy_Artwork(IPadPaletteRenderer renderer);
 bool IPad_Palette_Has_Humvee_Artwork(IPadPaletteRenderer renderer);
 bool IPad_Palette_Has_Minigunner_Artwork(IPadPaletteRenderer renderer);
+bool IPad_Palette_Has_GDI_MCV_Artwork(IPadPaletteRenderer renderer);
+bool IPad_Palette_Has_Nod_MCV_Artwork(IPadPaletteRenderer renderer);
+bool IPad_Palette_Has_GDI_Infrastructure_Artwork(IPadPaletteRenderer renderer);
+bool IPad_Palette_Has_Nod_Infrastructure_Artwork(IPadPaletteRenderer renderer);
+bool IPad_Palette_Has_GDI_Infrastructure_Activity_Artwork(IPadPaletteRenderer renderer);
+bool IPad_Palette_Has_Nod_Infrastructure_Activity_Artwork(IPadPaletteRenderer renderer);
 
 // presentation_mode: 0 = sharp fractional, 1 = integer pixel-perfect,
 // 2 = classic nearest-neighbour fractional.
@@ -87,6 +115,9 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
                          int presentation_mode,
                          int artwork_mode,
                          IPadPaletteRect viewport,
+                         IPadPaletteRect world_clip,
+                         const IPadHDBuildingOverlay* buildings,
+                         int building_count,
                          const IPadHDBuggyOverlay* buggies,
                          int buggy_count,
                          const IPadHDInfantryOverlay* infantry,

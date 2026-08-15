@@ -21,6 +21,13 @@ SettingsClass::SettingsClass()
     Mouse.ControllerEnabled = false;
     Mouse.ControllerPointerSpeed = 10;
     Options.MouseWheelScrolling = true;
+    Touch.EdgeScroll = true;
+    Touch.ScrollSpeed = 1;
+    Touch.SelectionTolerance = 1;
+    Vision.LookToScroll = true;
+    Vision.ScrollSpeed = 1;
+    Vision.EdgeSensitivity = 1;
+    Vision.SelectionTolerance = 1;
 
     /*
     ** Video settings
@@ -76,6 +83,10 @@ void SettingsClass::Load(INIClass& ini)
     */
     Options.MouseWheelScrolling = ini.Get_Bool("Options", "MouseWheelScrolling", Options.MouseWheelScrolling);
     Options.MouseWheelScrolling = ini.Get_Bool("Mouse", "MouseWheelScrolling", Options.MouseWheelScrolling);
+    Touch.EdgeScroll = ini.Get_Bool("iPadOS", "TouchEdgeScroll", Touch.EdgeScroll);
+    Touch.ScrollSpeed = Bound(ini.Get_Int("iPadOS", "TouchScrollSpeed", Touch.ScrollSpeed), 0, 2);
+    Touch.SelectionTolerance =
+        Bound(ini.Get_Int("iPadOS", "TouchSelectionTolerance", Touch.SelectionTolerance), 0, 2);
 
     /*
     ** Video settings
@@ -121,6 +132,18 @@ void SettingsClass::Load(INIClass& ini)
     Video.InterpolationMode = Bound(ini.Get_Int("Video", "InterpolationMode", Video.InterpolationMode), 0, 2);
 
     /*
+    ** Native Vision Pro controls. These values are harmless on the other
+    ** targets, but live in their own section because gaze-assisted scrolling
+    ** and spatial pinch tolerances are visionOS capabilities.
+    */
+    Vision.LookToScroll = ini.Get_Bool("visionOS", "LookToScroll", Vision.LookToScroll);
+    Vision.ScrollSpeed = Bound(ini.Get_Int("visionOS", "ScrollSpeed", Vision.ScrollSpeed), 0, 2);
+    Vision.EdgeSensitivity =
+        Bound(ini.Get_Int("visionOS", "EdgeSensitivity", Vision.EdgeSensitivity), 0, 2);
+    Vision.SelectionTolerance =
+        Bound(ini.Get_Int("visionOS", "SelectionTolerance", Vision.SelectionTolerance), 0, 2);
+
+    /*
     ** Boxing and raw input require software cursor.
     */
     if (Video.Boxing || Mouse.RawInput || Mouse.ControllerEnabled) {
@@ -147,6 +170,9 @@ void SettingsClass::Save(INIClass& ini)
     ini.Put_Bool("Mouse", "ControllerEnabled", Mouse.ControllerEnabled);
     ini.Put_Int("Mouse", "ControllerPointerSpeed", Mouse.ControllerPointerSpeed);
     ini.Put_Bool("Mouse", "MouseWheelScrolling", Options.MouseWheelScrolling);
+    ini.Put_Bool("iPadOS", "TouchEdgeScroll", Touch.EdgeScroll);
+    ini.Put_Int("iPadOS", "TouchScrollSpeed", Touch.ScrollSpeed);
+    ini.Put_Int("iPadOS", "TouchSelectionTolerance", Touch.SelectionTolerance);
 
     /*
     ** Video settings
@@ -175,6 +201,11 @@ void SettingsClass::Save(INIClass& ini)
     ** VQA and WSA interpolation mode 0 = scanlines, 1 = vertical doubling, 2 = linear
     */
     ini.Put_Int("Video", "InterpolationMode", Video.InterpolationMode);
+
+    ini.Put_Bool("visionOS", "LookToScroll", Vision.LookToScroll);
+    ini.Put_Int("visionOS", "ScrollSpeed", Vision.ScrollSpeed);
+    ini.Put_Int("visionOS", "EdgeSensitivity", Vision.EdgeSensitivity);
+    ini.Put_Int("visionOS", "SelectionTolerance", Vision.SelectionTolerance);
 
     ini.Put_String(
         "Video", "ButtonStyle", Video.ButtonStyle == -1 ? "Default" : (Video.ButtonStyle == 1 ? "Gold" : "Classic"));

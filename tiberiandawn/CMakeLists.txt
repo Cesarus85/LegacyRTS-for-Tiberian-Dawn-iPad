@@ -295,8 +295,20 @@ if(BUILD_VANILLATD)
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/humvee
             )
             set_source_files_properties(
-                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x-v2.png
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/minigunner
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/gdi-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/nod-mcv-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/mcv
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-activity-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-activity-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/infrastructure
             )
             target_sources(TiberianDawn PRIVATE
                 ${CMAKE_SOURCE_DIR}/resources/ipados/Assets.xcassets
@@ -305,7 +317,13 @@ if(BUILD_VANILLATD)
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
-                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x-v2.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/gdi-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/nod-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-activity-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-activity-atlas-4x.png
             )
             set_target_properties(TiberianDawn PROPERTIES
                 MACOSX_BUNDLE_GUI_IDENTIFIER "${IPADOS_BUNDLE_IDENTIFIER}"
@@ -323,6 +341,8 @@ if(BUILD_VANILLATD)
                 set_target_properties(TiberianDawn PROPERTIES
                     XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${IPADOS_DEVELOPMENT_TEAM}"
                     XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+                    XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "YES"
+                    XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "YES"
                 )
             endif()
         elseif(VISIONOS_PORT)
@@ -351,8 +371,20 @@ if(BUILD_VANILLATD)
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/humvee
             )
             set_source_files_properties(
-                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x-v2.png
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/minigunner
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/gdi-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/nod-mcv-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/mcv
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-activity-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-activity-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/infrastructure
             )
             target_sources(TiberianDawn PRIVATE
                 ${CMAKE_SOURCE_DIR}/resources/visionos/Assets.xcassets
@@ -361,7 +393,13 @@ if(BUILD_VANILLATD)
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
-                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x-v2.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/gdi-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/nod-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-activity-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-activity-atlas-4x.png
             )
             set_target_properties(TiberianDawn PROPERTIES
                 MACOSX_BUNDLE_GUI_IDENTIFIER "${VISIONOS_BUNDLE_IDENTIFIER}"
@@ -376,6 +414,12 @@ if(BUILD_VANILLATD)
                 set_target_properties(TiberianDawn PROPERTIES
                     XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${VISIONOS_DEVELOPMENT_TEAM}"
                     XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+                    # The shared visionOS preset disables signing globally so
+                    # CI can compile static dependencies without credentials.
+                    # Re-enable it only for the installable application when
+                    # a local development team was supplied.
+                    XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "YES"
+                    XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "YES"
                 )
             endif()
         elseif(MACOS_PORT)
@@ -400,8 +444,20 @@ if(BUILD_VANILLATD)
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/humvee
             )
             set_source_files_properties(
-                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x-v2.png
                 PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/minigunner
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/gdi-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/nod-mcv-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/mcv
+            )
+            set_source_files_properties(
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-activity-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-activity-atlas-4x.png
+                PROPERTIES MACOSX_PACKAGE_LOCATION Resources/ModernArt/units/infrastructure
             )
             target_sources(TiberianDawn PRIVATE
                 ${CMAKE_SOURCE_DIR}/resources/macos/Assets.xcassets
@@ -409,7 +465,13 @@ if(BUILD_VANILLATD)
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/ui/cursor-default.png
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/buggy/buggy-atlas-4x.png
                 ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/humvee/humvee-atlas-4x.png
-                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/minigunner/minigunner-atlas-4x-v2.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/gdi-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/mcv/nod-mcv-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/gdi-infrastructure-activity-atlas-4x.png
+                ${CMAKE_SOURCE_DIR}/resources/apple/ModernArt/units/infrastructure/nod-infrastructure-activity-atlas-4x.png
             )
             set_target_properties(TiberianDawn PROPERTIES
                 MACOSX_BUNDLE_GUI_IDENTIFIER "org.tiberiandawn.macos"

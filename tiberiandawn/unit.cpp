@@ -2049,13 +2049,32 @@ void UnitClass::Draw_It(int x, int y, WindowNumberType window)
     **	with the render process.
     */
     const bool is_hidden = (Visual_Character() == VISUAL_HIDDEN) && (window != WINDOW_VIRTUAL);
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
-    const bool hd_vehicle_type = *this == UNIT_BUGGY || *this == UNIT_JEEP;
-    const int hd_vehicle_kind = *this == UNIT_JEEP ? 1 : 0;
-    const bool hd_vehicle_available = hd_vehicle_kind == 1 ? Video_Uses_HD_Humvee_Artwork()
-                                                           : Video_Uses_HD_Buggy_Artwork();
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+    const bool hd_vehicle_type = *this == UNIT_BUGGY || *this == UNIT_JEEP || *this == UNIT_MCV;
+    const bool hd_vehicle_is_mcv = *this == UNIT_MCV;
+    const bool hd_vehicle_is_nod = House && House->ActLike == HOUSE_BAD;
+    const int hd_vehicle_kind = hd_vehicle_is_mcv ? (hd_vehicle_is_nod ? 3 : 2) : (*this == UNIT_JEEP ? 1 : 0);
+    const bool hd_vehicle_available = hd_vehicle_is_mcv
+                                          ? Video_Uses_HD_MCV_Artwork(hd_vehicle_is_nod)
+                                          : (hd_vehicle_kind == 1 ? Video_Uses_HD_Humvee_Artwork()
+                                                                  : Video_Uses_HD_Buggy_Artwork());
+    // The HD sprite is composited after the indexed tactical buffer, including
+    // its shroud. Only promote it while the centre cell is currently visible.
+    // Suppress the classic replacement body outside that boundary as well, so
+    // crossing fog never produces a one-frame legacy-art flash.
+    const CELL hd_cell = Coord_Cell(Center_Coord());
+    const bool hd_cell_visible = Debug_Map || Debug_Unshroud
+                                 || (PlayerPtr && Is_Discovered_By_Player(PlayerPtr)
+                                     && Map[hd_cell].Is_Visible(PlayerPtr));
+    // The MCV atlas deliberately covers only its normal, undamaged field
+    // appearance. Keep original shapes for damage and special visual states.
+    const bool hd_vehicle_state_supported = !hd_vehicle_is_mcv
+                                            || (Health_Ratio() >= 0x0080 && Flagged == HOUSE_NONE);
     const bool use_hd_vehicle = hd_vehicle_type && window == WINDOW_TACTICAL
-                                && Visual_Character() == VISUAL_NORMAL && hd_vehicle_available;
+                                && Visual_Character() == VISUAL_NORMAL && hd_vehicle_available
+                                && hd_cell_visible && hd_vehicle_state_supported;
+    const bool suppress_classic_vehicle = hd_vehicle_type && window == WINDOW_TACTICAL
+                                          && hd_vehicle_available && !hd_cell_visible;
     if (hd_vehicle_type && window == WINDOW_TACTICAL && !use_hd_vehicle) {
         Video_Remove_HD_Artwork(this);
     }
@@ -2185,20 +2204,24 @@ void UnitClass::Draw_It(int x, int y, WindowNumberType window)
         // if (*this == UNIT_HOVER) {
         //	Mono_Printf("Display hover %p %d.\n", shapefile, shapenum);
         //}
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
-        if (!use_hd_vehicle) {
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+        if (!use_hd_vehicle && !suppress_classic_vehicle) {
             Techno_Draw_Object(shapefile, shapenum, x, y, window);
         }
         if (use_hd_vehicle) {
             const int origin_x = WindowList[window][WINDOWX] + LogicPage->Get_XPos();
             const int origin_y = WindowList[window][WINDOWY] + LogicPage->Get_YPos();
+            // Authored MCV atlases use compass order N..NW. Buggy and Humvee
+            // atlases were generated in the classic reversed BodyShape frame order,
+            // so their already-resolved shape frame must remain untouched.
+            const int hd_frame = hd_vehicle_is_mcv ? Dir_Facing(PrimaryFacing.Current()) : shapenum;
             Video_Set_HD_Vehicle_Component(this,
-                                         hd_vehicle_kind,
-                                         0,
-                                         shapenum,
-                                         origin_x + x,
-                                         origin_y + y,
-                                         House ? House->Class->BrightColor : WHITE);
+                                           hd_vehicle_kind,
+                                           0,
+                                           hd_frame,
+                                           origin_x + x,
+                                           origin_y + y,
+                                           House ? House->Class->BrightColor : WHITE);
         }
 #else
         Techno_Draw_Object(shapefile, shapenum, x, y, window);
@@ -2273,8 +2296,8 @@ void UnitClass::Draw_It(int x, int y, WindowNumberType window)
             /*
             **	Actually perform the draw. Overlay an optional shimmer effect as necessary.
             */
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
-            if (!use_hd_vehicle) {
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+            if (!use_hd_vehicle && !suppress_classic_vehicle) {
                 Techno_Draw_Object(shapefile, shapenum, x1, y1, window);
             }
             if (use_hd_vehicle) {

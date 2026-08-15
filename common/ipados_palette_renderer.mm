@@ -18,6 +18,7 @@
     id<MTLRenderPipelineState> ModernCursorPipeline;
     id<MTLRenderPipelineState> SelectionPipeline;
     id<MTLRenderPipelineState> HDSpritePipeline;
+    id<MTLRenderPipelineState> HDBuildingPipeline;
     id<MTLRenderPipelineState> HDSpriteShadowPipeline;
     id<MTLRenderPipelineState> HealthPipeline;
     id<MTLTexture> IndexTexture;
@@ -27,6 +28,12 @@
     id<MTLTexture> BuggyAtlasTexture;
     id<MTLTexture> HumveeAtlasTexture;
     id<MTLTexture> MinigunnerAtlasTexture;
+    id<MTLTexture> GDIMCVAtlasTexture;
+    id<MTLTexture> NodMCVAtlasTexture;
+    id<MTLTexture> GDIInfrastructureAtlasTexture;
+    id<MTLTexture> NodInfrastructureAtlasTexture;
+    id<MTLTexture> GDIInfrastructureActivityAtlasTexture;
+    id<MTLTexture> NodInfrastructureActivityAtlasTexture;
     int Width;
     int Height;
     int CursorWidth;
@@ -53,6 +60,17 @@ struct PaletteParameters {
     packed_float2 output_size;
     uint mode;
     uint artwork_mode;
+};
+
+struct BuildingParameters {
+    packed_float2 source_size;
+    packed_float2 output_size;
+    uint mode;
+    uint artwork_mode;
+    float completion;
+    float damage;
+    uint repairing;
+    uint padding;
 };
 
 vertex PaletteVertexOutput TiberianDawnPaletteVertex(uint vertex_id [[vertex_id]])
@@ -197,11 +215,12 @@ fragment float4 TiberianDawnHDSpriteFragment(PaletteVertexOutput input [[stage_i
                                      min_filter::linear,
                                      mag_filter::linear);
     const uint frame = parameters.mode;
+    const uint columns = max(uint(parameters.source_size.x), 1u);
     const float rows = max(float(parameters.source_size.y), 1.0);
     const float2 atlas_size = float2(atlas.get_width(), atlas.get_height());
-    const float2 cell = float2(frame & 7u, frame >> 3u);
+    const float2 cell = float2(frame % columns, frame / columns);
     const float2 inset = 0.5 / atlas_size;
-    const float2 grid = float2(8.0, rows);
+    const float2 grid = float2(float(columns), rows);
     const float2 cell_min = cell / grid + inset;
     const float2 cell_max = (cell + 1.0) / grid - inset;
     const float2 atlas_uv = mix(cell_min, cell_max, input.uv);
@@ -223,6 +242,88 @@ fragment float4 TiberianDawnHDSpriteFragment(PaletteVertexOutput input [[stage_i
     return artwork;
 }
 
+fragment float4 TiberianDawnHDBuildingFragment(PaletteVertexOutput input [[stage_in]],
+                                            constant BuildingParameters& parameters [[buffer(0)]],
+                                            texture2d<float> atlas [[texture(0)]],
+                                            texture2d<float, access::read> palette [[texture(1)]])
+{
+    constexpr sampler sprite_sampler(coord::normalized,
+                                     address::clamp_to_edge,
+                                     min_filter::linear,
+                                     mag_filter::linear);
+    const uint frame = parameters.mode;
+    const uint columns = max(uint(parameters.source_size.x), 1u);
+    const float rows = max(float(parameters.source_size.y), 1.0);
+    const float2 atlas_size = float2(atlas.get_width(), atlas.get_height());
+    const float2 cell = float2(frame % columns, frame / columns);
+    const float2 inset = 0.5 / atlas_size;
+    const float2 grid = float2(float(columns), rows);
+    const float2 atlas_uv = mix(cell / grid + inset,
+                                (cell + 1.0) / grid - inset,
+                                input.uv);
+    float4 artwork = atlas.sample(sprite_sampler, atlas_uv);
+    if (artwork.a <= 0.002) discard_fragment();
+
+    const float completion = clamp(parameters.completion, 0.0, 1.0);
+    const float2 reveal_cell = floor(input.uv * float2(79.0, 61.0));
+    const float reveal_noise = fract(sin(dot(reveal_cell,
+                                             float2(12.9898, 78.233))
+                                           + float(frame) * 19.19) * 43758.5453);
+    const float reveal_edge = 1.0 - completion;
+    const float reveal_position = input.uv.y + (reveal_noise - 0.5) * 0.075;
+    if (completion < 0.999 && reveal_position < reveal_edge) discard_fragment();
+
+    // Preserve the same neutral-panel house-colour treatment as mobile HD art.
+    const float maximum = max(artwork.r, max(artwork.g, artwork.b));
+    const float minimum = min(artwork.r, min(artwork.g, artwork.b));
+    const float saturation = maximum - minimum;
+    const float luminance = dot(artwork.rgb, float3(0.299, 0.587, 0.114));
+    const float neutral = 1.0 - smoothstep(0.055, 0.22, saturation);
+    const float paint = neutral * smoothstep(0.28, 0.70, luminance)
+                        * (1.0 - smoothstep(0.88, 0.99, luminance));
+    const float3 house = palette.read(uint2(parameters.artwork_mode & 255u, 0)).rgb;
+    const float house_luminance = dot(house, float3(0.299, 0.587, 0.114));
+    const float3 readable_house = mix(house,
+                                      float3(1.0),
+                                      clamp(0.28 - house_luminance * 0.15, 0.06, 0.22));
+    artwork.rgb = mix(artwork.rgb,
+                      readable_house * (0.62 + luminance * 0.48),
+                      paint * 0.78);
+
+    // Construction and deconstruction share one bottom-up assembly mask. The
+    // engine reverses completion for sell/deploy-back, avoiding any style cut.
+    if (completion < 0.999) {
+        const float assembly_band = 1.0 - smoothstep(0.018,
+                                                     0.085,
+                                                     abs(reveal_position - reveal_edge));
+        artwork.rgb = mix(artwork.rgb, float3(0.96, 0.68, 0.18), assembly_band * 0.48);
+    }
+
+    // A stable procedural soot pattern communicates damage without switching
+    // back to the low-resolution damaged SHP. As health returns, it fades out.
+    const float damage = clamp(parameters.damage, 0.0, 1.0);
+    const float2 damage_cell = floor(input.uv * float2(43.0, 37.0));
+    const float soot_noise = fract(sin(dot(damage_cell,
+                                           float2(39.3468, 11.135))
+                                         + float(frame) * 7.73) * 24634.6345);
+    const float soot = damage * smoothstep(0.76 - damage * 0.24, 0.98, soot_noise);
+    const float damaged_luminance = dot(artwork.rgb, float3(0.299, 0.587, 0.114));
+    artwork.rgb = mix(artwork.rgb, float3(damaged_luminance) * 0.58, damage * 0.42);
+    artwork.rgb *= 1.0 - damage * 0.16 - soot * 0.48;
+    const float ember = smoothstep(0.975, 0.997, soot_noise)
+                        * smoothstep(0.58, 0.96, damage);
+    artwork.rgb += ember * float3(0.34, 0.055, 0.008);
+
+    if (parameters.repairing != 0u) {
+        const float repair_line = smoothstep(0.82,
+                                             0.98,
+                                             fract((input.uv.x + input.uv.y) * 7.0));
+        artwork.rgb = mix(artwork.rgb, float3(0.42, 0.92, 0.58), repair_line * 0.18);
+    }
+    artwork.rgb = clamp(artwork.rgb, 0.0, 1.0);
+    return artwork;
+}
+
 fragment float4 TiberianDawnHDShadowFragment(PaletteVertexOutput input [[stage_in]],
                                           constant PaletteParameters& parameters [[buffer(0)]],
                                           texture2d<float> atlas [[texture(0)]])
@@ -232,11 +333,12 @@ fragment float4 TiberianDawnHDShadowFragment(PaletteVertexOutput input [[stage_i
                                      min_filter::linear,
                                      mag_filter::linear);
     const uint frame = parameters.mode;
+    const uint columns = max(uint(parameters.source_size.x), 1u);
     const float rows = max(float(parameters.source_size.y), 1.0);
     const float2 atlas_size = float2(atlas.get_width(), atlas.get_height());
-    const float2 cell = float2(frame & 7u, frame >> 3u);
+    const float2 cell = float2(frame % columns, frame / columns);
     const float2 inset = 0.5 / atlas_size;
-    const float2 grid = float2(8.0, rows);
+    const float2 grid = float2(float(columns), rows);
     const float2 atlas_uv = mix(cell / grid + inset,
                                 (cell + 1.0) / grid - inset,
                                 input.uv);
@@ -313,6 +415,20 @@ struct PaletteParameters
     float output_height;
     std::uint32_t mode;
     std::uint32_t artwork_mode;
+};
+
+struct BuildingParameters
+{
+    float source_width;
+    float source_height;
+    float output_width;
+    float output_height;
+    std::uint32_t mode;
+    std::uint32_t artwork_mode;
+    float completion;
+    float damage;
+    std::uint32_t repairing;
+    std::uint32_t padding;
 };
 
 TiberianDawnPaletteRendererState* State(IPadPaletteRenderer renderer)
@@ -395,6 +511,12 @@ IPadPaletteRenderer IPad_Palette_Create(SDL_Renderer* renderer,
                                         const char* buggy_atlas_path,
                                         const char* humvee_atlas_path,
                                         const char* minigunner_atlas_path,
+                                        const char* gdi_mcv_atlas_path,
+                                        const char* nod_mcv_atlas_path,
+                                        const char* gdi_infrastructure_atlas_path,
+                                        const char* nod_infrastructure_atlas_path,
+                                        const char* gdi_infrastructure_activity_atlas_path,
+                                        const char* nod_infrastructure_activity_atlas_path,
                                         int modern_asset_scale)
 {
     if (!renderer || width <= 0 || height <= 0) return nullptr;
@@ -448,6 +570,11 @@ IPadPaletteRenderer IPad_Palette_Create(SDL_Renderer* renderer,
                                            layer.pixelFormat,
                                            @"TiberianDawnHDSpriteFragment",
                                            true);
+    state->HDBuildingPipeline = MakePipeline(state->Device,
+                                             library,
+                                             layer.pixelFormat,
+                                             @"TiberianDawnHDBuildingFragment",
+                                             true);
     state->HDSpriteShadowPipeline = MakePipeline(state->Device,
                                                  library,
                                                  layer.pixelFormat,
@@ -533,8 +660,127 @@ IPadPaletteRenderer IPad_Palette_Create(SDL_Renderer* renderer,
                   static_cast<unsigned long>(state->MinigunnerAtlasTexture.height));
         }
     }
+    if (gdi_mcv_atlas_path && gdi_mcv_atlas_path[0] != '\0') {
+        NSString* path = [NSString stringWithUTF8String:gdi_mcv_atlas_path];
+        NSError* texture_error = nil;
+        state->GDIMCVAtlasTexture = [loader newTextureWithContentsOfURL:[NSURL fileURLWithPath:path]
+                                                               options:@{MTKTextureLoaderOptionSRGB: @NO,
+                                                                         MTKTextureLoaderOptionOrigin:
+                                                                             MTKTextureLoaderOriginTopLeft}
+                                                                 error:&texture_error];
+        if (!state->GDIMCVAtlasTexture || state->GDIMCVAtlasTexture.width != 1536
+            || state->GDIMCVAtlasTexture.height != 192) {
+            NSLog(@"Tiberian Dawn HD GDI MCV atlas rejected; original sprite fallback active: %@",
+                  texture_error.localizedDescription);
+            state->GDIMCVAtlasTexture = nil;
+        } else {
+            NSLog(@"Tiberian Dawn HD GDI MCV atlas active: %lux%lu, 8 frames",
+                  static_cast<unsigned long>(state->GDIMCVAtlasTexture.width),
+                  static_cast<unsigned long>(state->GDIMCVAtlasTexture.height));
+        }
+    }
+    if (nod_mcv_atlas_path && nod_mcv_atlas_path[0] != '\0') {
+        NSString* path = [NSString stringWithUTF8String:nod_mcv_atlas_path];
+        NSError* texture_error = nil;
+        state->NodMCVAtlasTexture = [loader newTextureWithContentsOfURL:[NSURL fileURLWithPath:path]
+                                                               options:@{MTKTextureLoaderOptionSRGB: @NO,
+                                                                         MTKTextureLoaderOptionOrigin:
+                                                                             MTKTextureLoaderOriginTopLeft}
+                                                                 error:&texture_error];
+        if (!state->NodMCVAtlasTexture || state->NodMCVAtlasTexture.width != 1536
+            || state->NodMCVAtlasTexture.height != 192) {
+            NSLog(@"Tiberian Dawn HD Nod MCV atlas rejected; original sprite fallback active: %@",
+                  texture_error.localizedDescription);
+            state->NodMCVAtlasTexture = nil;
+        } else {
+            NSLog(@"Tiberian Dawn HD Nod MCV atlas active: %lux%lu, 8 frames",
+                  static_cast<unsigned long>(state->NodMCVAtlasTexture.width),
+                  static_cast<unsigned long>(state->NodMCVAtlasTexture.height));
+        }
+    }
+    if (gdi_infrastructure_atlas_path && gdi_infrastructure_atlas_path[0] != '\0') {
+        NSString* path = [NSString stringWithUTF8String:gdi_infrastructure_atlas_path];
+        NSError* texture_error = nil;
+        state->GDIInfrastructureAtlasTexture = [loader newTextureWithContentsOfURL:[NSURL fileURLWithPath:path]
+                                                                          options:@{MTKTextureLoaderOptionSRGB: @NO,
+                                                                                    MTKTextureLoaderOptionOrigin:
+                                                                                        MTKTextureLoaderOriginTopLeft}
+                                                                            error:&texture_error];
+        if (!state->GDIInfrastructureAtlasTexture || state->GDIInfrastructureAtlasTexture.width != 768
+            || state->GDIInfrastructureAtlasTexture.height != 256) {
+            NSLog(@"Tiberian Dawn HD GDI infrastructure atlas rejected; original sprite fallback active: %@",
+                  texture_error.localizedDescription);
+            state->GDIInfrastructureAtlasTexture = nil;
+        } else {
+            NSLog(@"Tiberian Dawn HD GDI infrastructure atlas active: %lux%lu, 3 frames",
+                  static_cast<unsigned long>(state->GDIInfrastructureAtlasTexture.width),
+                  static_cast<unsigned long>(state->GDIInfrastructureAtlasTexture.height));
+        }
+    }
+    if (nod_infrastructure_atlas_path && nod_infrastructure_atlas_path[0] != '\0') {
+        NSString* path = [NSString stringWithUTF8String:nod_infrastructure_atlas_path];
+        NSError* texture_error = nil;
+        state->NodInfrastructureAtlasTexture = [loader newTextureWithContentsOfURL:[NSURL fileURLWithPath:path]
+                                                                          options:@{MTKTextureLoaderOptionSRGB: @NO,
+                                                                                    MTKTextureLoaderOptionOrigin:
+                                                                                        MTKTextureLoaderOriginTopLeft}
+                                                                            error:&texture_error];
+        if (!state->NodInfrastructureAtlasTexture || state->NodInfrastructureAtlasTexture.width != 768
+            || state->NodInfrastructureAtlasTexture.height != 256) {
+            NSLog(@"Tiberian Dawn HD Nod infrastructure atlas rejected; original sprite fallback active: %@",
+                  texture_error.localizedDescription);
+            state->NodInfrastructureAtlasTexture = nil;
+        } else {
+            NSLog(@"Tiberian Dawn HD Nod infrastructure atlas active: %lux%lu, 3 frames",
+                  static_cast<unsigned long>(state->NodInfrastructureAtlasTexture.width),
+                  static_cast<unsigned long>(state->NodInfrastructureAtlasTexture.height));
+        }
+    }
+    if (gdi_infrastructure_activity_atlas_path && gdi_infrastructure_activity_atlas_path[0] != '\0') {
+        NSString* path = [NSString stringWithUTF8String:gdi_infrastructure_activity_atlas_path];
+        NSError* texture_error = nil;
+        state->GDIInfrastructureActivityAtlasTexture =
+            [loader newTextureWithContentsOfURL:[NSURL fileURLWithPath:path]
+                                        options:@{MTKTextureLoaderOptionSRGB: @NO,
+                                                  MTKTextureLoaderOptionOrigin:
+                                                      MTKTextureLoaderOriginTopLeft}
+                                          error:&texture_error];
+        if (!state->GDIInfrastructureActivityAtlasTexture
+            || state->GDIInfrastructureActivityAtlasTexture.width != 2560
+            || state->GDIInfrastructureActivityAtlasTexture.height != 768) {
+            NSLog(@"Tiberian Dawn HD GDI infrastructure activity atlas rejected; original animation fallback active: %@",
+                  texture_error.localizedDescription);
+            state->GDIInfrastructureActivityAtlasTexture = nil;
+        } else {
+            NSLog(@"Tiberian Dawn HD GDI infrastructure activity atlas active: %lux%lu, 30 frames",
+                  static_cast<unsigned long>(state->GDIInfrastructureActivityAtlasTexture.width),
+                  static_cast<unsigned long>(state->GDIInfrastructureActivityAtlasTexture.height));
+        }
+    }
+    if (nod_infrastructure_activity_atlas_path && nod_infrastructure_activity_atlas_path[0] != '\0') {
+        NSString* path = [NSString stringWithUTF8String:nod_infrastructure_activity_atlas_path];
+        NSError* texture_error = nil;
+        state->NodInfrastructureActivityAtlasTexture =
+            [loader newTextureWithContentsOfURL:[NSURL fileURLWithPath:path]
+                                        options:@{MTKTextureLoaderOptionSRGB: @NO,
+                                                  MTKTextureLoaderOptionOrigin:
+                                                      MTKTextureLoaderOriginTopLeft}
+                                          error:&texture_error];
+        if (!state->NodInfrastructureActivityAtlasTexture
+            || state->NodInfrastructureActivityAtlasTexture.width != 2560
+            || state->NodInfrastructureActivityAtlasTexture.height != 768) {
+            NSLog(@"Tiberian Dawn HD Nod infrastructure activity atlas rejected; original animation fallback active: %@",
+                  texture_error.localizedDescription);
+            state->NodInfrastructureActivityAtlasTexture = nil;
+        } else {
+            NSLog(@"Tiberian Dawn HD Nod infrastructure activity atlas active: %lux%lu, 30 frames",
+                  static_cast<unsigned long>(state->NodInfrastructureActivityAtlasTexture.width),
+                  static_cast<unsigned long>(state->NodInfrastructureActivityAtlasTexture.height));
+        }
+    }
     if (!state->IndexTexture || !state->PaletteTexture || !state->BasePipeline || !state->CursorPipeline
         || !state->ModernCursorPipeline || !state->SelectionPipeline || !state->HDSpritePipeline
+        || !state->HDBuildingPipeline
         || !state->HDSpriteShadowPipeline || !state->HealthPipeline) {
         return nullptr;
     }
@@ -565,6 +811,42 @@ bool IPad_Palette_Has_Minigunner_Artwork(IPadPaletteRenderer renderer)
     return state && state->MinigunnerAtlasTexture;
 }
 
+bool IPad_Palette_Has_GDI_MCV_Artwork(IPadPaletteRenderer renderer)
+{
+    TiberianDawnPaletteRendererState* state = State(renderer);
+    return state && state->GDIMCVAtlasTexture;
+}
+
+bool IPad_Palette_Has_Nod_MCV_Artwork(IPadPaletteRenderer renderer)
+{
+    TiberianDawnPaletteRendererState* state = State(renderer);
+    return state && state->NodMCVAtlasTexture;
+}
+
+bool IPad_Palette_Has_GDI_Infrastructure_Artwork(IPadPaletteRenderer renderer)
+{
+    TiberianDawnPaletteRendererState* state = State(renderer);
+    return state && state->GDIInfrastructureAtlasTexture;
+}
+
+bool IPad_Palette_Has_Nod_Infrastructure_Artwork(IPadPaletteRenderer renderer)
+{
+    TiberianDawnPaletteRendererState* state = State(renderer);
+    return state && state->NodInfrastructureAtlasTexture;
+}
+
+bool IPad_Palette_Has_GDI_Infrastructure_Activity_Artwork(IPadPaletteRenderer renderer)
+{
+    TiberianDawnPaletteRendererState* state = State(renderer);
+    return state && state->GDIInfrastructureActivityAtlasTexture;
+}
+
+bool IPad_Palette_Has_Nod_Infrastructure_Activity_Artwork(IPadPaletteRenderer renderer)
+{
+    TiberianDawnPaletteRendererState* state = State(renderer);
+    return state && state->NodInfrastructureActivityAtlasTexture;
+}
+
 bool IPad_Palette_Render(IPadPaletteRenderer renderer,
                          SDL_Renderer* sdl_renderer,
                          const void* indexed_pixels,
@@ -576,6 +858,9 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
                          int presentation_mode,
                          int artwork_mode,
                          IPadPaletteRect viewport,
+                         IPadPaletteRect world_clip,
+                         const IPadHDBuildingOverlay* buildings,
+                         int building_count,
                          const IPadHDBuggyOverlay* buggies,
                          int buggy_count,
                          const IPadHDInfantryOverlay* infantry,
@@ -643,32 +928,83 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
     [encoder setFragmentBytes:&parameters length:sizeof(parameters) atIndex:0];
     [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
 
+    if (artwork_mode != 0 && buildings && building_count > 0) {
+        // Infrastructure lives underneath mobile objects. Its atlas cells
+        // contain the faction-specific power plant, barracks and yard.
+        [encoder setRenderPipelineState:state->HDBuildingPipeline];
+        [encoder setFragmentTexture:state->PaletteTexture atIndex:1];
+        for (int index = 0; index < building_count; ++index) {
+            const IPadHDBuildingOverlay& building = buildings[index];
+            id<MTLTexture> infrastructure_atlas = building.faction_kind == 1
+                                                       ? state->NodInfrastructureAtlasTexture
+                                                       : state->GDIInfrastructureAtlasTexture;
+            const bool active = building.activity_frame >= 0;
+            if (active) {
+                infrastructure_atlas = building.faction_kind == 1
+                                           ? state->NodInfrastructureActivityAtlasTexture
+                                           : state->GDIInfrastructureActivityAtlasTexture;
+            }
+            const int atlas_frame = active ? building.activity_frame : building.frame;
+            const int columns = active ? 10 : 3;
+            const int rows = active ? 3 : 1;
+            const int frame_count = active ? 30 : 3;
+            if (!infrastructure_atlas || atlas_frame < 0 || atlas_frame >= frame_count
+                || building.destination.width <= 0 || building.destination.height <= 0) continue;
+            [encoder setFragmentTexture:infrastructure_atlas atIndex:0];
+            const BuildingParameters sprite_parameters = {
+                static_cast<float>(columns),
+                static_cast<float>(rows),
+                static_cast<float>(building.destination.width),
+                static_cast<float>(building.destination.height),
+                static_cast<std::uint32_t>(atlas_frame),
+                static_cast<std::uint32_t>(building.palette_index),
+                static_cast<float>(building.completion) / 255.0f,
+                static_cast<float>(building.damage) / 255.0f,
+                building.repairing ? 1u : 0u,
+                0u,
+            };
+            SetViewport(encoder, building.destination);
+            SetScissor(encoder, world_clip, layer);
+            [encoder setFragmentBytes:&sprite_parameters length:sizeof(sprite_parameters) atIndex:0];
+            [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+        }
+    }
+
     if (artwork_mode != 0 && buggies && buggy_count > 0) {
+        const auto vehicle_texture = [state](int atlas_kind) -> id<MTLTexture> {
+            switch (atlas_kind) {
+                case 1: return state->HumveeAtlasTexture;
+                case 2: return state->GDIMCVAtlasTexture;
+                case 3: return state->NodMCVAtlasTexture;
+                default: return state->BuggyAtlasTexture;
+            }
+        };
         // The HD body replaces the classic sprite. Recreate its grounding
         // shadow from the body alpha before drawing the coloured components.
         [encoder setRenderPipelineState:state->HDSpriteShadowPipeline];
         for (int index = 0; index < buggy_count; ++index) {
             const IPadHDBuggyOverlay& buggy = buggies[index];
-            id<MTLTexture> vehicle_atlas = buggy.atlas_kind == 1
-                                              ? state->HumveeAtlasTexture
-                                              : state->BuggyAtlasTexture;
+            id<MTLTexture> vehicle_atlas = vehicle_texture(buggy.atlas_kind);
             if (!vehicle_atlas) continue;
             [encoder setFragmentTexture:vehicle_atlas atIndex:0];
-            if (buggy.body_frame < 0 || buggy.body_destination.width <= 0
+            const int atlas_rows = buggy.atlas_kind >= 2 ? 1 : 8;
+            const int frame_count = 8 * atlas_rows;
+            if (buggy.body_frame < 0 || buggy.body_frame >= frame_count
+                || buggy.body_destination.width <= 0
                 || buggy.body_destination.height <= 0) continue;
             IPadPaletteRect shadow_destination = buggy.body_destination;
             shadow_destination.x += std::max(1, shadow_destination.width / 12);
             shadow_destination.y += std::max(1, shadow_destination.height / 8);
             const PaletteParameters shadow_parameters = {
                 8.0f,
-                8.0f,
+                static_cast<float>(atlas_rows),
                 static_cast<float>(shadow_destination.width),
                 static_cast<float>(shadow_destination.height),
                 static_cast<std::uint32_t>(buggy.body_frame),
                 0,
             };
             SetViewport(encoder, shadow_destination);
-            SetScissor(encoder, viewport, layer);
+            SetScissor(encoder, world_clip, layer);
             [encoder setFragmentBytes:&shadow_parameters length:sizeof(shadow_parameters) atIndex:0];
             [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
@@ -677,26 +1013,27 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
         [encoder setFragmentTexture:state->PaletteTexture atIndex:1];
         for (int index = 0; index < buggy_count; ++index) {
             const IPadHDBuggyOverlay& buggy = buggies[index];
-            id<MTLTexture> vehicle_atlas = buggy.atlas_kind == 1
-                                              ? state->HumveeAtlasTexture
-                                              : state->BuggyAtlasTexture;
+            id<MTLTexture> vehicle_atlas = vehicle_texture(buggy.atlas_kind);
             if (!vehicle_atlas) continue;
             [encoder setFragmentTexture:vehicle_atlas atIndex:0];
             const int frames[2] = {buggy.body_frame, buggy.turret_frame};
             const IPadPaletteRect destinations[2] = {buggy.body_destination, buggy.turret_destination};
+            const int atlas_rows = buggy.atlas_kind >= 2 ? 1 : 8;
+            const int frame_count = 8 * atlas_rows;
             for (int component = 0; component < 2; ++component) {
-                if (frames[component] < 0 || destinations[component].width <= 0
+                if (frames[component] < 0 || frames[component] >= frame_count
+                    || destinations[component].width <= 0
                     || destinations[component].height <= 0) continue;
                 const PaletteParameters sprite_parameters = {
                     8.0f,
-                    8.0f,
+                    static_cast<float>(atlas_rows),
                     static_cast<float>(destinations[component].width),
                     static_cast<float>(destinations[component].height),
                     static_cast<std::uint32_t>(frames[component]),
                     static_cast<std::uint32_t>(buggy.palette_index),
                 };
                 SetViewport(encoder, destinations[component]);
-                SetScissor(encoder, viewport, layer);
+                SetScissor(encoder, world_clip, layer);
                 [encoder setFragmentBytes:&sprite_parameters length:sizeof(sprite_parameters) atIndex:0];
                 [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
             }
@@ -722,7 +1059,7 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
                 0,
             };
             SetViewport(encoder, shadow_destination);
-            SetScissor(encoder, viewport, layer);
+            SetScissor(encoder, world_clip, layer);
             [encoder setFragmentBytes:&shadow_parameters length:sizeof(shadow_parameters) atIndex:0];
             [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
@@ -743,7 +1080,7 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
                 static_cast<std::uint32_t>(soldier.palette_index),
             };
             SetViewport(encoder, soldier.destination);
-            SetScissor(encoder, viewport, layer);
+            SetScissor(encoder, world_clip, layer);
             [encoder setFragmentBytes:&sprite_parameters length:sizeof(sprite_parameters) atIndex:0];
             [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
@@ -764,7 +1101,7 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
                 0,
             };
             SetViewport(encoder, selection.destination);
-            SetScissor(encoder, viewport, layer);
+            SetScissor(encoder, world_clip, layer);
             [encoder setFragmentBytes:&selection_parameters length:sizeof(selection_parameters) atIndex:0];
             [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
@@ -772,6 +1109,27 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
 
     // Health bars are deliberately last among world overlays so neither the
     // HD chassis nor the modern selection frame can cover their centre.
+    if (artwork_mode != 0 && buildings && building_count > 0) {
+        [encoder setRenderPipelineState:state->HealthPipeline];
+        [encoder setFragmentTexture:state->PaletteTexture atIndex:1];
+        for (int index = 0; index < building_count; ++index) {
+            const IPadHDBuildingOverlay& building = buildings[index];
+            if (!building.health_visible || building.health_destination.width <= 0
+                || building.health_destination.height <= 0) continue;
+            const PaletteParameters health_parameters = {
+                static_cast<float>(building.health_fill_width),
+                1.0f,
+                static_cast<float>(building.health_destination.width),
+                static_cast<float>(building.health_destination.height),
+                static_cast<std::uint32_t>(building.health_palette_index),
+                0,
+            };
+            SetViewport(encoder, building.health_destination);
+            SetScissor(encoder, world_clip, layer);
+            [encoder setFragmentBytes:&health_parameters length:sizeof(health_parameters) atIndex:0];
+            [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+        }
+    }
     if (artwork_mode != 0 && buggies && buggy_count > 0) {
         [encoder setRenderPipelineState:state->HealthPipeline];
         [encoder setFragmentTexture:state->PaletteTexture atIndex:1];
@@ -788,7 +1146,7 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
                 0,
             };
             SetViewport(encoder, buggy.health_destination);
-            SetScissor(encoder, viewport, layer);
+            SetScissor(encoder, world_clip, layer);
             [encoder setFragmentBytes:&health_parameters length:sizeof(health_parameters) atIndex:0];
             [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
@@ -809,7 +1167,7 @@ bool IPad_Palette_Render(IPadPaletteRenderer renderer,
                 0,
             };
             SetViewport(encoder, soldier.health_destination);
-            SetScissor(encoder, viewport, layer);
+            SetScissor(encoder, world_clip, layer);
             [encoder setFragmentBytes:&health_parameters length:sizeof(health_parameters) atIndex:0];
             [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }

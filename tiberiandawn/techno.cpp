@@ -1033,7 +1033,7 @@ void TechnoClass::Draw_It(int x, int y, WindowNumberType window)
     int dy = height / 5;
     int fudge = show_health_bar ? 4 : 0;
 
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
     if (window == WINDOW_TACTICAL && !show_health_bar) {
         Video_Set_HD_Health(this, false, 0, 0, 0, 0, 0);
     }
@@ -1072,7 +1072,7 @@ void TechnoClass::Draw_It(int x, int y, WindowNumberType window)
             y -= 5;
         }
 
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
         if (window == WINDOW_TACTICAL && Is_Selected_By_Player()) {
             const int origin_x = WindowList[window][WINDOWX] + LogicPage->Get_XPos();
             const int origin_y = WindowList[window][WINDOWY] + LogicPage->Get_YPos();
@@ -1115,7 +1115,7 @@ void TechnoClass::Draw_It(int x, int y, WindowNumberType window)
                 color = RED;
             }
             draw_window.Fill_Rect(xx + 1, yy + 1, xx + pwidth, yy + (3 - 1), color);
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
             if (window == WINDOW_TACTICAL) {
                 const int origin_x = WindowList[window][WINDOWX] + LogicPage->Get_XPos();
                 const int origin_y = WindowList[window][WINDOWY] + LogicPage->Get_YPos();
@@ -1134,7 +1134,7 @@ void TechnoClass::Draw_It(int x, int y, WindowNumberType window)
         **	Draw the selected object graphic.
         */
         if (Is_Selected_By_Player()
-#if defined(IPADOS_PORT) || defined(MACOS_PORT)
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
             && !Video_Uses_Modern_Artwork()
 #endif
         ) {

@@ -280,17 +280,21 @@ index 676fedb..df9c998 100644
  #include "../../events/SDL_mouse_c.h"
  #include "../../events/SDL_touch_c.h"
  #include "../../events/SDL_events_c.h"
-@@ -36,6 +37,9 @@
+@@ -36,6 +37,13 @@
  
  /* The maximum number of mouse buttons we support */
  #define MAX_MOUSE_BUTTONS    5
 +#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_HOVER       0x5048
++#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_HOVER_END   0x5045
 +#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_DOUBLE_TAP  0x5044
-+#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE     0x5053
++#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE_BEGIN   0x5051
++#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE_MOVE    0x5052
++#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE_END     0x5053
++#define TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE_CANCEL  0x5054
  
  /* This is defined in SDL_sysjoystick.m */
  #ifndef SDL_JOYSTICK_DISABLED
-@@ -47,6 +51,36 @@ @implementation SDL_uikitview {
+@@ -47,6 +55,40 @@ @implementation SDL_uikitview {
  
      SDL_TouchID directTouchId;
      SDL_TouchID indirectTouchId;
@@ -322,12 +326,16 @@ index 676fedb..df9c998 100644
 +    if (recognizer.state == UIGestureRecognizerStateBegan || recognizer.state == UIGestureRecognizerStateChanged) {
 +        tiberianDawnForiPadLastPencilHover = [recognizer locationInView:self];
 +        [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_HOVER location:tiberianDawnForiPadLastPencilHover];
++    } else if (recognizer.state == UIGestureRecognizerStateEnded
++               || recognizer.state == UIGestureRecognizerStateCancelled
++               || recognizer.state == UIGestureRecognizerStateFailed) {
++        [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_HOVER_END location:tiberianDawnForiPadLastPencilHover];
 +    }
  }
 +#endif
  
  - (instancetype)initWithFrame:(CGRect)frame
-@@ -91,6 +125,18 @@ - (instancetype)initWithFrame:(CGRect)frame
+@@ -91,6 +133,18 @@ - (instancetype)initWithFrame:(CGRect)frame
          if (@available(iOS 13.4, *)) {
              [self addInteraction:[[UIPointerInteraction alloc] initWithDelegate:self]];
          }
@@ -346,7 +354,7 @@ index 676fedb..df9c998 100644
  #endif
      }
  
-@@ -216,6 +262,12 @@ - (CGPoint)touchLocation:(UITouch *)touch shouldNormalize:(BOOL)normalize
+@@ -216,6 +270,12 @@ - (CGPoint)touchLocation:(UITouch *)touch shouldNormalize:(BOOL)normalize
  - (float)pressureForTouch:(UITouch *)touch
  {
  #ifdef __IPHONE_9_0
@@ -359,7 +367,7 @@ index 676fedb..df9c998 100644
      if ([touch respondsToSelector:@selector(force)]) {
          return (float) touch.force;
      }
-@@ -224,6 +276,27 @@ - (float)pressureForTouch:(UITouch *)touch
+@@ -224,6 +284,39 @@ - (float)pressureForTouch:(UITouch *)touch
      return 1.0f;
  }
  
@@ -377,9 +385,21 @@ index 676fedb..df9c998 100644
 +
 +- (void)pencilInteraction:(UIPencilInteraction *)interaction didReceiveSqueeze:(UIPencilInteractionSqueeze *)squeeze API_AVAILABLE(ios(17.5))
 +{
-+    if (squeeze.phase == UIPencilInteractionPhaseEnded) {
-+        CGPoint location = squeeze.hoverPose != nil ? squeeze.hoverPose.location : tiberianDawnForiPadLastPencilHover;
-+        [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE location:location];
++    CGPoint location = squeeze.hoverPose != nil ? squeeze.hoverPose.location : tiberianDawnForiPadLastPencilHover;
++    tiberianDawnForiPadLastPencilHover = location;
++    switch (squeeze.phase) {
++        case UIPencilInteractionPhaseBegan:
++            [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE_BEGIN location:location];
++            break;
++        case UIPencilInteractionPhaseChanged:
++            [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE_MOVE location:location];
++            break;
++        case UIPencilInteractionPhaseEnded:
++            [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE_END location:location];
++            break;
++        case UIPencilInteractionPhaseCancelled:
++            [self tiberianDawnForiPadPushPencilEvent:TIBERIAN_DAWN_FOR_IPAD_PENCIL_SQUEEZE_CANCEL location:location];
++            break;
 +    }
 +}
 +#endif
@@ -387,14 +407,14 @@ index 676fedb..df9c998 100644
  - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
  {
      for (UITouch *touch in touches) {
-@@ -238,3 +303,5 @@ - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -238,3 +324,5 @@ - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
                      for (i = 1; i <= MAX_MOUSE_BUTTONS; ++i) {
 -                        if (event.buttonMask & SDL_BUTTON(i)) {
 +                        const NSUInteger buttonMask = SDL_BUTTON(i);
 +                        if ((event.buttonMask & buttonMask)
 +                            && !(tiberianDawnForiPadPressedMouseButtons & buttonMask)) {
                              Uint8 button;
-@@ -254,6 +321,11 @@ - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -254,6 +342,11 @@ - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
                                  break;
                              }
                              SDL_SendMouseButton(sdlwindow, 0, SDL_PRESSED, button);
@@ -406,13 +426,13 @@ index 676fedb..df9c998 100644
 +                        tiberianDawnForiPadPressedMouseButtons = SDL_BUTTON(1);
 +                    }
                  }
-@@ -294,3 +362,4 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -294,3 +383,4 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
                      for (i = 1; i <= MAX_MOUSE_BUTTONS; ++i) {
 -                        if (event.buttonMask & SDL_BUTTON(i)) {
 +                        const NSUInteger buttonMask = SDL_BUTTON(i);
 +                        if ((tiberianDawnForiPadPressedMouseButtons | event.buttonMask) & buttonMask) {
                              Uint8 button;
-@@ -310,6 +379,7 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -310,6 +400,7 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
                                  break;
                              }
                              SDL_SendMouseButton(sdlwindow, 0, SDL_RELEASED, button);
@@ -420,7 +440,7 @@ index 676fedb..df9c998 100644
                          }
                      }
                  }
-@@ -321,7 +391,7 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -321,7 +412,7 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
              CGPoint locationInView;
              SDL_TouchDeviceType touchType = [self touchTypeForTouch:touch];
              SDL_TouchID touchId = [self touchIdForType:touchType];
@@ -429,7 +449,7 @@ index 676fedb..df9c998 100644
  
              if (SDL_AddTouch(touchId, touchType, "") < 0) {
                  continue;
-@@ -338,7 +408,9 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
+@@ -338,7 +429,9 @@ - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
  
  - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
  {

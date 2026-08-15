@@ -80,6 +80,11 @@ void GameOptionsClass::Adjust_Variables_For_Resolution(void)
  *=============================================================================================*/
 void GameOptionsClass::Process(void)
 {
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+    // World artwork is composited after the indexed framebuffer. Suppress it
+    // while modal UI is drawn so units and buildings cannot cover buttons.
+    Video_Set_HD_World_Artwork_Visible(false);
+#endif
     static struct
     {
         int ID;         // Button ID to use.
@@ -481,6 +486,9 @@ void GameOptionsClass::Process(void)
     Keyboard->Clear();
     Call_Back();
     HiddenPage.Clear();
+#if defined(IPADOS_PORT) || defined(MACOS_PORT) || defined(VISIONOS_PORT)
+    Video_Set_HD_World_Artwork_Visible(true);
+#endif
     Call_Back();
     Map.Flag_To_Redraw(true);
     Map.Render();

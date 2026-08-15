@@ -123,6 +123,7 @@ set(COMMONV_SRC
     hd_asset_pack.cpp
     interpal.cpp
     ipados_layout.cpp
+    ipados_pencil.cpp
     install_transaction.cpp
     iso9660.cpp
     recovery_transaction.cpp
@@ -134,6 +135,7 @@ set(COMMONV_SRC
     vqapalette.cpp
     vqatask.cpp
     vqaver.cpp
+    visionos_input.cpp
     wwkeyboard.cpp
     wwmouse.cpp
 )
